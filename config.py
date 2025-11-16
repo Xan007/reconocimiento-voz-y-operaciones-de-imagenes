@@ -10,7 +10,7 @@ TARGET_N = 44100         # tamaño FFT / tamaño de señal (usa potencia de 2 ce
                          # Si grabas DURATION*FS != TARGET_N, pad/trim en audio_utils.
 
 # FFT / subbands
-N_SUBBANDS = 3          # dividir espectro en subbandas
+N_SUBBANDS = 8          # dividir espectro en subbandas
 
 # Rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
