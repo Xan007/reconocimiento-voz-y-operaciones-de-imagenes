@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-chart-bar"></i> Análisis de Modelos</h1>
+    <p class="subtitle">Visualiza y analiza los modelos entrenados</p>
+</div>
+
+<div class="models-container">
+    <div class="model-selector">
+        <label for="modelSelect"><i class="fas fa-list"></i> Seleccionar Modelo:</label>
+        <select id="modelSelect" onchange="loadModelData()">
+            <option value="">-- Selecciona un modelo --</option>
+            {% for model_name in model_names %}
+                <option value="{{ model_name }}">{{ model_name.upper() }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="model-info" id="modelInfo" style="display: none;">
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Modelo:</span>
+                <span class="info-value" id="infoModel">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Muestras:</span>
+                <span class="info-value" id="infoSamples">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Bandas de Frecuencia:</span>
+                <span class="info-value" id="infoBands">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Energía Total:</span>
+                <span class="info-value" id="infoEnergy">-</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="plots-container" id="plotsContainer" style="display: none;">
+        <div class="plot-section full-width">
+            <h3><i class="fas fa-chart-bar"></i> Distribución de Energía por Banda</h3>
+            <div id="energyDistributionPlot" class="plot"></div>
+        </div>
+
+        <div class="plot-section full-width">
+            <h3><i class="fas fa-chart-line"></i> Variabilidad (Desviación Estándar) por Banda</h3>
+            <div id="stdPlot" class="plot"></div>
+        </div>
+
+        <div class="plot-section full-width">
+            <h3><i class="fas fa-sliders-h"></i> Energía Media ± Desviación Estándar</h3>
+            <div id="errorBarPlot" class="plot"></div>
+        </div>
+    </div>
+
+    <div class="normalization-options" id="normalizationOptions" style="display: none;">
+        <label>
+            <input type="checkbox" id="normalizeCheckbox" onchange="loadModelData()" />
+            Normalizar datos
+        </label>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadModelData() {
+        const modelSelect = document.getElementById('modelSelect');
+        const modelName = modelSelect.value;
+
+        if (!modelName) {
+            document.getElementById('modelInfo').style.display = 'none';
+            document.getElementById('plotsContainer').style.display = 'none';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/models/${modelName}/data`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert('Error al cargar el modelo: ' + data.error);
+                return;
+            }
+
+            displayModelInfo(data);
+            createPlots(data);
+
+            document.getElementById('modelInfo').style.display = 'grid';
+            document.getElementById('plotsContainer').style.display = 'block';
+            document.getElementById('normalizationOptions').style.display = 'block';
+
+        } catch (error) {
+            console.error('Error cargando datos del modelo:', error);
+            alert('Error al cargar los datos del modelo');
+        }
+    }
+
+    function displayModelInfo(data) {
+        document.getElementById('infoModel').textContent = data.model_name.toUpperCase();
+        document.getElementById('infoSamples').textContent = data.num_samples;
+        document.getElementById('infoBands').textContent = data.n_bands;
+        document.getElementById('infoEnergy').textContent = data.total_energy.toFixed(4);
+    }
+
+    function createPlots(data) {
+        const normalize = document.getElementById('normalizeCheckbox').checked;
+        
+        let meanEnergy = [...data.mean_energy];
+        let stdEnergy = [...data.std_energy];
+
+        // Normalizar si está seleccionado
+        if (normalize) {
+            const minE = Math.min(...meanEnergy);
+            const maxE = Math.max(...meanEnergy);
+            const range = maxE - minE;
+            
+            if (range > 0) {
+                meanEnergy = meanEnergy.map(e => (e - minE) / range);
+                stdEnergy = stdEnergy.map(s => s / range);
+            }
+        }
+
+        const bands = data.bands;
+
+        // Gráfica 1: Distribución de energía
+        Plotly.newPlot('energyDistributionPlot', [{
+            x: bands,
+            y: meanEnergy,
+            type: 'bar',
+            marker: {
+                color: '#0066cc',
+                opacity: 0.7
+            },
+            name: 'Energía Media'
+        }], {
+            title: `Distribución de Energía - Modelo ${data.model_name.toUpperCase()}`,
+            xaxis: { title: 'Banda de Frecuencia' },
+            yaxis: { title: normalize ? 'Energía Relativa' : 'Energía' },
+            margin: { l: 60, r: 20, t: 40, b: 40 },
+            responsive: true,
+            plot_bgcolor: '#f8f9fa',
+            paper_bgcolor: 'white'
+        }, { responsive: true });
+
+        // Gráfica 2: Desviación estándar
+        Plotly.newPlot('stdPlot', [{
+            x: bands,
+            y: stdEnergy,
+            type: 'scatter',
+            mode: 'lines+markers',
+            fill: 'tozeroy',
+            marker: {
+                color: '#ff6600',
+                size: 8
+            },
+            line: {
+                color: '#ff6600',
+                width: 2
+            },
+            name: 'Desviación Estándar'
+        }], {
+            title: `Variabilidad - Modelo ${data.model_name.toUpperCase()}`,
+            xaxis: { title: 'Banda de Frecuencia' },
+            yaxis: { title: normalize ? 'Desv. Est. Relativa' : 'Desviación Estándar' },
+            margin: { l: 60, r: 20, t: 40, b: 40 },
+            responsive: true,
+            plot_bgcolor: '#f8f9fa',
+            paper_bgcolor: 'white'
+        }, { responsive: true });
+
+        // Gráfica 3: Error bar chart
+        const upperBound = meanEnergy.map((m, i) => m + stdEnergy[i]);
+        const lowerBound = meanEnergy.map((m, i) => Math.max(0, m - stdEnergy[i]));
+
+        Plotly.newPlot('errorBarPlot', [{
+            x: bands,
+            y: meanEnergy,
+            error_y: {
+                type: 'data',
+                array: stdEnergy,
+                visible: true
+            },
+            type: 'scatter',
+            mode: 'markers+lines',
+            marker: {
+                color: '#00aa66',
+                size: 10
+            },
+            line: {
+                color: '#00aa66',
+                width: 2
+            },
+            name: 'Media ± σ'
+        }], {
+            title: `Energía Media con Intervalos - Modelo ${data.model_name.toUpperCase()}`,
+            xaxis: { title: 'Banda de Frecuencia' },
+            yaxis: { title: normalize ? 'Energía Relativa' : 'Energía' },
+            margin: { l: 60, r: 20, t: 40, b: 40 },
+            responsive: true,
+            plot_bgcolor: '#f8f9fa',
+            paper_bgcolor: 'white'
+        }, { responsive: true });
+    }
+
+    // Cargar información de modelos al inicio
+    window.addEventListener('load', async () => {
+        try {
+            const response = await fetch('/api/models');
+            const models = await response.json();
+            
+            const modelSelect = document.getElementById('modelSelect');
+            if (models.length === 0) {
+                modelSelect.innerHTML += '<option disabled>No hay modelos disponibles</option>';
+                modelSelect.disabled = true;
+            }
+        } catch (error) {
+            console.error('Error cargando lista de modelos:', error);
+        }
+    });
+</script>
+{% endblock %}

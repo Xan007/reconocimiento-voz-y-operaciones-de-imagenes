@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="training-wrapper">
+    <div class="training-card">
+        <h2>Número de Subbandas</h2>
+        <p>Configura cuántas bandas de frecuencia usar para el análisis FFT.</p>
+        
+        <div class="form-group">
+            <label for="n_subbands">Subbandas:</label>
+            <input type="number" id="n_subbands" min="2" max="32" step="1" value="{{ n_subbands }}" />
+            <button id="updateBtn" class="btn-update">Actualizar</button>
+        </div>
+        
+        <div id="statusMessage" class="status-message" style="display:none;"></div>
+    </div>
+    
+    <div class="training-card">
+        <h2>Entrenar Modelos</h2>
+        <p>Entrena los modelos con los datos actuales de <code>data/comandos/</code></p>
+        <button id="trainBtn" class="btn-train">Entrenar Ahora</button>
+        <div id="trainStatus" class="status-message" style="display:none;"></div>
+    </div>
+</div>
+
+<style>
+.training-wrapper {
+    max-width: 700px;
+    margin: 2rem auto;
+    display: grid;
+    gap: 2rem;
+    padding: 2rem 1rem;
+}
+
+.training-card {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+    border-top: 4px solid var(--primary);
+}
+
+.training-card h2 {
+    color: var(--primary);
+    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.training-card p {
+    color: var(--gray);
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.form-group {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.form-group label {
+    color: var(--dark);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.form-group input {
+    flex: 0 0 80px;
+    padding: 0.7rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.btn-update {
+    padding: 0.7rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-update:hover {
+    background: #004499;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-update:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-train {
+    width: 100%;
+    padding: 1.2rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-train:hover {
+    background: #004499;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-train:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.status-message {
+    padding: 0.9rem 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-left: 4px solid transparent;
+}
+
+.status-message.success {
+    background: #f0f9ff;
+    color: #004499;
+    border-left-color: var(--primary);
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left-color: #ef4444;
+}
+
+code {
+    background: #f5f5f5;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+@media (max-width: 600px) {
+    .training-wrapper {
+        padding: 1rem;
+    }
+    
+    .training-card {
+        padding: 1.5rem;
+    }
+    
+    .form-group {
+        flex-wrap: wrap;
+    }
+    
+    .form-group input {
+        flex: 1 1 auto;
+        min-width: 60px;
+    }
+    
+    .btn-update {
+        flex: 1 1 auto;
+    }
+}
+</style>
+
+<script>
+const updateBtn = document.getElementById('updateBtn');
+const trainBtn = document.getElementById('trainBtn');
+const statusMessage = document.getElementById('statusMessage');
+const trainStatus = document.getElementById('trainStatus');
+const nSubbandsInput = document.getElementById('n_subbands');
+
+updateBtn.addEventListener('click', async () => {
+    const nSubbands = parseInt(nSubbandsInput.value);
+    
+    if (nSubbands < 2 || nSubbands > 32) {
+        showStatus(statusMessage, 'N_SUBBANDS debe estar entre 2 y 32', 'error');
+        return;
+    }
+    
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Actualizando...';
+    
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ N_SUBBANDS: nSubbands })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus(statusMessage, '✓ ' + data.message, 'success');
+        } else {
+            showStatus(statusMessage, '✗ ' + data.error, 'error');
+        }
+    } catch (error) {
+        showStatus(statusMessage, '✗ Error: ' + error.message, 'error');
+    } finally {
+        updateBtn.disabled = false;
+        updateBtn.textContent = 'Actualizar';
+    }
+});
+
+trainBtn.addEventListener('click', async () => {
+    if (!confirm('¿Entrenar modelos ahora? Esto puede tomar unos segundos...')) {
+        return;
+    }
+    
+    trainBtn.disabled = true;
+    trainBtn.textContent = 'Entrenando...';
+    
+    try {
+        const response = await fetch('/api/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus(trainStatus, '✓ ' + data.message, 'success');
+        } else {
+            showStatus(trainStatus, '✗ ' + data.error, 'error');
+        }
+    } catch (error) {
+        showStatus(trainStatus, '✗ Error: ' + error.message, 'error');
+    } finally {
+        trainBtn.disabled = false;
+        trainBtn.textContent = 'Entrenar Ahora';
+    }
+});
+
+function showStatus(element, message, type) {
+    element.textContent = message;
+    element.className = 'status-message ' + type;
+    element.style.display = 'block';
+    
+    if (type === 'success') {
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 5000);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,451 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="evaluation-wrapper">
+    <div class="evaluation-card">
+        <h2>Evaluación de Modelos</h2>
+        <p>Calcula el margen de error usando todos los archivos de entrenamiento. Se ingresa cada grabación como entrada y se verifica si la predicción coincide con el comando real (determinado por la carpeta).</p>
+        
+        <button id="evaluateBtn" class="btn-evaluate">Iniciar Evaluación</button>
+        
+        <div id="evaluationStatus" class="status-message" style="display:none;"></div>
+        <div id="loadingSpinner" class="spinner" style="display:none;"></div>
+    </div>
+    
+    <div id="resultsContainer" style="display:none;">
+        <div class="evaluation-card">
+            <h2>Resultados de la Evaluación</h2>
+            
+            <div class="summary-section">
+                <h3>Resumen General</h3>
+                <div class="summary-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Aciertos</span>
+                        <span class="stat-value" id="totalAciertos">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Evaluaciones</span>
+                        <span class="stat-value" id="totalEvaluaciones">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Margen de Acierto</span>
+                        <span class="stat-value percentage" id="totalPorcentaje">-</span>
+                    </div>
+                    <div class="stat-item error-item">
+                        <span class="stat-label">Margen de Error</span>
+                        <span class="stat-value percentage error" id="totalError">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="por-comando-section">
+                <h3>Resultados por Comando</h3>
+                <div id="commandResults" class="command-results"></div>
+            </div>
+            
+            <div class="confusion-matrix-section">
+                <h3>Matriz de Confusión</h3>
+                <div id="confusionMatrix" class="confusion-matrix"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.evaluation-wrapper {
+    max-width: 900px;
+    margin: 2rem auto;
+    display: grid;
+    gap: 2rem;
+    padding: 2rem 1rem;
+}
+
+.evaluation-card {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+    border-top: 4px solid var(--primary);
+}
+
+.evaluation-card h2 {
+    color: var(--primary);
+    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.evaluation-card p {
+    color: var(--gray);
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.btn-evaluate {
+    width: 100%;
+    padding: 1.2rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-evaluate:hover {
+    background: #004499;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-evaluate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.status-message {
+    padding: 0.9rem 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-left: 4px solid transparent;
+}
+
+.status-message.success {
+    background: #f0f9ff;
+    color: #004499;
+    border-left-color: var(--primary);
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left-color: #ef4444;
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0, 102, 204, 0.3);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 0.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.summary-section {
+    margin-bottom: 2rem;
+}
+
+.summary-section h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e8eef7 100%);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+.stat-item.error-item {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #fecaca;
+}
+
+.stat-item.error-item .stat-value.error {
+    color: #dc2626;
+}
+
+.stat-label {
+    display: block;
+    color: var(--gray);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    display: block;
+    color: var(--primary);
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.stat-value.percentage {
+    font-size: 2rem;
+}
+
+.por-comando-section {
+    margin-bottom: 2rem;
+}
+
+.por-comando-section h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.command-results {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.command-row {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    align-items: center;
+}
+
+.command-name {
+    font-weight: 600;
+    color: var(--primary);
+    text-transform: uppercase;
+}
+
+.command-stats {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.command-percent {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.confusion-matrix-section {
+    margin-top: 2rem;
+}
+
+.confusion-matrix-section h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.confusion-matrix {
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+table th {
+    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+    color: white;
+    padding: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+table td {
+    padding: 0.8rem;
+    text-align: center;
+    border-right: 1px solid #e0e0e0;
+}
+
+table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+table tbody tr:last-child {
+    border-bottom: none;
+}
+
+table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+table td:first-child {
+    font-weight: 600;
+    color: var(--primary);
+    text-align: left;
+}
+
+table td[data-correct="true"] {
+    background: rgba(34, 197, 94, 0.1);
+    font-weight: 600;
+    color: #166534;
+}
+
+@media (max-width: 600px) {
+    .evaluation-wrapper {
+        padding: 1rem;
+    }
+    
+    .evaluation-card {
+        padding: 1.5rem;
+    }
+    
+    .command-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+const evaluateBtn = document.getElementById('evaluateBtn');
+const evaluationStatus = document.getElementById('evaluationStatus');
+const loadingSpinner = document.getElementById('loadingSpinner');
+const resultsContainer = document.getElementById('resultsContainer');
+
+evaluateBtn.addEventListener('click', async () => {
+    if (!confirm('¿Ejecutar evaluación? Esto procesará todas las grabaciones y puede tomar unos minutos...')) {
+        return;
+    }
+    
+    evaluateBtn.disabled = true;
+    evaluateBtn.textContent = 'Evaluando...';
+    loadingSpinner.style.display = 'inline-block';
+    evaluationStatus.style.display = 'none';
+    resultsContainer.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showResults(data.results);
+            showStatus('✓ Evaluación completada exitosamente', 'success');
+        } else {
+            showStatus('✗ Error: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showStatus('✗ Error: ' + error.message, 'error');
+    } finally {
+        evaluateBtn.disabled = false;
+        evaluateBtn.textContent = 'Iniciar Evaluación';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+function showStatus(message, type) {
+    evaluationStatus.textContent = message;
+    evaluationStatus.className = 'status-message ' + type;
+    evaluationStatus.style.display = 'block';
+}
+
+function showResults(results) {
+    // Resumen general
+    document.getElementById('totalAciertos').textContent = results.total_aciertos;
+    document.getElementById('totalEvaluaciones').textContent = results.total_evaluaciones;
+    document.getElementById('totalPorcentaje').textContent = 
+        results.porcentaje_acierto.toFixed(1) + '%';
+    
+    // Calcular y mostrar margen de error
+    const margenError = 100 - results.porcentaje_acierto;
+    document.getElementById('totalError').textContent = margenError.toFixed(1) + '%';
+    
+    // Resultados por comando
+    const commandResults = document.getElementById('commandResults');
+    commandResults.innerHTML = '';
+    
+    for (const [comando, stats] of Object.entries(results.por_comando)) {
+        if (stats.total > 0) {
+            const row = document.createElement('div');
+            row.className = 'command-row';
+            row.innerHTML = `
+                <div class="command-name">${comando.toUpperCase()}</div>
+                <div class="command-stats">${stats.aciertos}/${stats.total}</div>
+                <div class="command-percent">${stats.porcentaje.toFixed(1)}%</div>
+            `;
+            commandResults.appendChild(row);
+        }
+    }
+    
+    // Matriz de confusión
+    buildConfusionMatrix(results.predicciones);
+    
+    resultsContainer.style.display = 'block';
+    // Scroll hacia resultados
+    resultsContainer.scrollIntoView({ behavior: 'smooth' });
+}
+
+function buildConfusionMatrix(predicciones) {
+    // Obtener comandos únicos
+    const comandos = [...new Set(
+        predicciones
+            .map(p => p.comando_real)
+            .filter(c => c)
+    )].sort();
+    
+    // Crear matriz
+    const matriz = {};
+    for (const real of comandos) {
+        matriz[real] = {};
+        for (const pred of comandos) {
+            matriz[real][pred] = 0;
+        }
+    }
+    
+    // Llenar matriz
+    for (const pred of predicciones) {
+        const real = pred.comando_real;
+        const prediccion = pred.prediccion || 'ERROR';
+        if (real in matriz && prediccion in matriz[real]) {
+            matriz[real][prediccion]++;
+        }
+    }
+    
+    // Construir tabla
+    let html = '<table><thead><tr><th>Real \\ Predicción</th>';
+    for (const cmd of comandos) {
+        html += `<th>${cmd.toUpperCase()}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    
+    for (const real of comandos) {
+        html += `<tr><td>${real.toUpperCase()}</td>`;
+        for (const pred of comandos) {
+            const valor = matriz[real][pred];
+            const isCorrect = real === pred && valor > 0;
+            const attr = isCorrect ? 'data-correct="true"' : '';
+            html += `<td ${attr}>${valor}</td>`;
+        }
+        html += '</tr>';
+    }
+    
+    html += '</tbody></table>';
+    document.getElementById('confusionMatrix').innerHTML = html;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="record-wrapper">
+    <div class="record-card">
+        <h2>Grabar Datos de Entrenamiento</h2>
+        <p>Graba audios para entrenar los modelos de reconocimiento. Todos los audios se guardarán con el nombre del sujeto para fines de registro.</p>
+        
+        <div class="record-form">
+            <div class="form-group">
+                <label for="nombreSujeto">Nombre del Sujeto *</label>
+                <input type="text" id="nombreSujeto" placeholder="Tu nombre o ID" required />
+                <small>Se usará para etiquetar las grabaciones</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="comandoSelect">Comando a Grabar *</label>
+                <select id="comandoSelect" required>
+                    <option value="">-- Selecciona un comando --</option>
+                    {% for comando in comandos %}
+                    <option value="{{ comando }}">{{ comando.upper() }}</option>
+                    {% endfor %}
+                </select>
+                <small>Elige qué comando deseas grabar</small>
+            </div>
+            
+            <div class="record-controls">
+                <button id="recordBtn" class="btn-record">
+                    <i class="fas fa-circle"></i> Grabar
+                </button>
+                <button id="stopBtn" class="btn-stop" style="display:none;">
+                    <i class="fas fa-stop-circle"></i> Detener
+                </button>
+                <button id="playBtn" class="btn-play" style="display:none;">
+                    <i class="fas fa-play"></i> Reproducir
+                </button>
+            </div>
+            
+            <div id="recordingTime" class="recording-time" style="display:none;">
+                <span id="timeDisplay">0.0</span>s / 1.0s
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="saveBtn" class="btn-save" style="display:none;">
+                    <i class="fas fa-save"></i> Guardar Grabación
+                </button>
+                <button id="cancelBtn" class="btn-cancel" style="display:none;">
+                    <i class="fas fa-times"></i> Descartar
+                </button>
+            </div>
+            
+            <div id="statusMessage" class="status-message" style="display:none;"></div>
+        </div>
+    </div>
+    
+    <div class="record-card info-card">
+        <h3>Instrucciones</h3>
+        <ul>
+            <li>Ingresa tu nombre o un identificador</li>
+            <li>Selecciona el comando que deseas grabar (uno, dos, tres, etc.)</li>
+            <li>Haz clic en "Grabar" y pronuncia el comando claramente</li>
+            <li>La grabación durará 1 segundo automáticamente</li>
+            <li>Puedes reproducir para verificar la calidad</li>
+            <li>Haz clic en "Guardar Grabación" para almacenarla</li>
+            <li>Repite el proceso varias veces para cada comando (mínimo 10 grabaciones)</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+.record-wrapper {
+    max-width: 900px;
+    margin: 2rem auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 2rem 1rem;
+}
+
+.record-card {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+    border-top: 4px solid var(--primary);
+}
+
+.record-card h2 {
+    color: var(--primary);
+    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.record-card p {
+    color: var(--gray);
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.info-card h3 {
+    color: var(--primary);
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.info-card ul {
+    padding-left: 1.5rem;
+    color: var(--gray);
+    line-height: 1.8;
+}
+
+.info-card li {
+    margin-bottom: 0.8rem;
+}
+
+.record-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    color: var(--dark);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group select {
+    padding: 0.8rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.form-group small {
+    color: var(--gray);
+    font-size: 0.85rem;
+}
+
+.record-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+.btn-record, .btn-stop, .btn-play, .btn-save, .btn-cancel {
+    padding: 1rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-record {
+    background: var(--primary);
+    color: white;
+    grid-column: 1 / -1;
+}
+
+.btn-record:hover {
+    background: #004499;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-record:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-stop {
+    background: #dc2626;
+    color: white;
+    grid-column: 1 / -1;
+}
+
+.btn-stop:hover {
+    background: #b91c1c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-play {
+    background: #16a34a;
+    color: white;
+}
+
+.btn-play:hover {
+    background: #15803d;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-play:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.recording-time {
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.progress-bar {
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    transition: width 0.05s linear;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.btn-save {
+    background: #16a34a;
+    color: white;
+}
+
+.btn-save:hover {
+    background: #15803d;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-cancel {
+    background: #9ca3af;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background: #6b7280;
+    transform: translateY(-2px);
+}
+
+.status-message {
+    padding: 0.9rem 1rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-left: 4px solid transparent;
+}
+
+.status-message.success {
+    background: #f0f9ff;
+    color: #004499;
+    border-left-color: var(--primary);
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left-color: #ef4444;
+}
+
+@media (max-width: 900px) {
+    .record-wrapper {
+        grid-template-columns: 1fr;
+    }
+    
+    .record-controls {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+const recordBtn = document.getElementById('recordBtn');
+const stopBtn = document.getElementById('stopBtn');
+const playBtn = document.getElementById('playBtn');
+const saveBtn = document.getElementById('saveBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const nombreSujeto = document.getElementById('nombreSujeto');
+const comandoSelect = document.getElementById('comandoSelect');
+const recordingTime = document.getElementById('recordingTime');
+const timeDisplay = document.getElementById('timeDisplay');
+const progressFill = document.getElementById('progressFill');
+const statusMessage = document.getElementById('statusMessage');
+
+const MAX_RECORDING_TIME = 1.0; // 1 segundo
+let mediaRecorder = null;
+let audioContext = null;
+let analyser = null;
+let recordedChunks = [];
+let recordingStartTime = null;
+let recordingInterval = null;
+let audioBlob = null;
+let audioBuffer = null;
+
+// Función para convertir audio PCM a WAV
+function encodeWAV(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    // "RIFF" chunk descriptor
+    view.setUint32(0, 0x46464952, true); // "RIFF"
+    view.setUint32(4, 36 + samples.length * 2, true);
+    view.setUint32(8, 0x45564157, true); // "WAVE"
+
+    // "fmt " sub-chunk
+    view.setUint32(12, 0x20746d66, true); // "fmt "
+    view.setUint32(16, 16, true); // chunkSize
+    view.setUint16(20, 1, true); // audioFormat (1 = PCM)
+    view.setUint16(22, 1, true); // numChannels (1 = mono)
+    view.setUint32(24, sampleRate, true); // sampleRate
+    view.setUint32(28, sampleRate * 2, true); // byteRate
+    view.setUint16(32, 2, true); // blockAlign
+    view.setUint16(34, 16, true); // bitsPerSample
+
+    // "data" sub-chunk
+    view.setUint32(36, 0x61746164, true); // "data"
+    view.setUint32(40, samples.length * 2, true);
+
+    // Write samples
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+        view.setInt16(offset, samples[i] * 32767, true);
+        offset += 2;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+
+// Solicitar permiso de micrófono
+async function requestMicrophonePermission() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+    } catch (error) {
+        showStatus('Error: No hay permiso para usar el micrófono', 'error');
+        return false;
+    }
+}
+
+recordBtn.addEventListener('click', async () => {
+    if (!nombreSujeto.value.trim()) {
+        showStatus('Por favor ingresa tu nombre', 'error');
+        return;
+    }
+    
+    if (!comandoSelect.value) {
+        showStatus('Por favor selecciona un comando', 'error');
+        return;
+    }
+    
+    // Solicitar permiso
+    const hasPermission = await requestMicrophonePermission();
+    if (!hasPermission) return;
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Usar Web Audio API para mejor control
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        // Crear ScriptProcessorNode para capturar audio PCM
+        const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        let audioSamples = [];
+        
+        scriptProcessor.onaudioprocess = (e) => {
+            const input = e.inputBuffer.getChannelData(0);
+            audioSamples.push(...Array.from(input));
+        };
+        
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
+        
+        recordingStartTime = Date.now();
+        recordBtn.style.display = 'none';
+        stopBtn.style.display = 'flex';
+        recordingTime.style.display = 'block';
+        
+        // Actualizar tiempo y detener automáticamente
+        recordingInterval = setInterval(() => {
+            const elapsed = (Date.now() - recordingStartTime) / 1000;
+            timeDisplay.textContent = elapsed.toFixed(1);
+            progressFill.style.width = (elapsed / MAX_RECORDING_TIME * 100) + '%';
+            
+            if (elapsed >= MAX_RECORDING_TIME) {
+                clearInterval(recordingInterval);
+                
+                // Detener grabación
+                source.disconnect();
+                scriptProcessor.disconnect();
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Crear WAV blob
+                audioBlob = encodeWAV(audioSamples, audioContext.sampleRate);
+                
+                recordingTime.style.display = 'none';
+                stopBtn.style.display = 'none';
+                recordBtn.style.display = 'flex';
+                playBtn.style.display = 'flex';
+                saveBtn.style.display = 'flex';
+                cancelBtn.style.display = 'flex';
+            }
+        }, 50);
+        
+    } catch (error) {
+        showStatus('Error al acceder al micrófono: ' + error.message, 'error');
+    }
+});
+
+stopBtn.addEventListener('click', () => {
+    clearInterval(recordingInterval);
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    stopBtn.style.display = 'none';
+    recordBtn.style.display = 'flex';
+});
+
+playBtn.addEventListener('click', () => {
+    if (audioBlob) {
+        const url = URL.createObjectURL(audioBlob);
+        const audio = new Audio(url);
+        audio.play();
+    }
+});
+
+saveBtn.addEventListener('click', async () => {
+    if (!audioBlob) return;
+    
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+    
+    try {
+        const formData = new FormData();
+        
+        // Convertir blob a WAV si es necesario
+        let wavBlob = audioBlob;
+        if (!audioBlob.type.includes('wav') && !audioBlob.type.includes('audio')) {
+            // El navegador ya lo grabó como WAV desde MediaRecorder
+            wavBlob = new Blob([audioBlob], { type: 'audio/wav' });
+        }
+        
+        formData.append('audio', wavBlob, 'recording.wav');
+        formData.append('comando', comandoSelect.value);
+        formData.append('nombre_sujeto', nombreSujeto.value.trim());
+        
+        const response = await fetch('/api/save-recording', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus('✓ ' + data.message, 'success');
+            resetRecording();
+        } else {
+            showStatus('✗ Error: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showStatus('✗ Error: ' + error.message, 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar Grabación';
+    }
+});
+
+cancelBtn.addEventListener('click', () => {
+    resetRecording();
+});
+
+function showRecordingControls() {
+    recordingTime.style.display = 'none';
+    recordBtn.style.display = 'flex';
+    playBtn.style.display = 'flex';
+    saveBtn.style.display = 'flex';
+    cancelBtn.style.display = 'flex';
+}
+
+function resetRecording() {
+    audioBlob = null;
+    audioChunks = [];
+    recordingStartTime = null;
+    clearInterval(recordingInterval);
+    recordingTime.style.display = 'none';
+    recordBtn.style.display = 'flex';
+    playBtn.style.display = 'none';
+    saveBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    timeDisplay.textContent = '0.0';
+    progressFill.style.width = '0%';
+}
+
+function showStatus(message, type) {
+    statusMessage.textContent = message;
+    statusMessage.className = 'status-message ' + type;
+    statusMessage.style.display = 'block';
+    
+    if (type === 'success') {
+        setTimeout(() => {
+            statusMessage.style.display = 'none';
+        }, 3000);
+    }
+}
+</script>
+{% endblock %}
