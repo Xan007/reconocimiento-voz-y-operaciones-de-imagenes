@@ -464,6 +464,98 @@ def internal_error(e):
     return render_template('500.html', error=str(e)), 500
 
 
+@app.route('/images')
+def images():
+    """Página para procesamiento de imágenes con DCT 2D"""
+    return render_template('images.html')
+
+
+@app.route('/api/process-image', methods=['POST'])
+def process_image():
+    """API para procesar imagen: escala grises -> DCT 2D -> invertir DCT"""
+    try:
+        from processing.image_processing import process_image_full_pipeline
+        
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'No hay imagen en la solicitud'}), 400
+        
+        image_file = request.files['image']
+        if image_file.filename == '':
+            return jsonify({'success': False, 'error': 'No se seleccionó archivo'}), 400
+        
+        # Obtener porcentaje de compresión del formulario
+        filter_percent = request.form.get('filter_percent', 0)
+        try:
+            filter_percent = min(100, max(0, int(filter_percent)))
+        except (ValueError, TypeError):
+            filter_percent = 0
+        
+        # Validar extensión
+        allowed_extensions = {'jpg', 'jpeg', 'png', 'bmp', 'gif'}
+        file_ext = image_file.filename.rsplit('.', 1)[1].lower() if '.' in image_file.filename else ''
+        if file_ext not in allowed_extensions:
+            return jsonify({'success': False, 'error': 'Formato no soportado. Use JPG, PNG, BMP o GIF'}), 400
+        
+        # Guardar temporalmente
+        import tempfile
+        temp_path = os.path.join(tempfile.gettempdir(), secure_filename(image_file.filename))
+        image_file.save(temp_path)
+        
+        # Procesar imagen con compresión
+        results = process_image_full_pipeline(temp_path, filter_percent=filter_percent)
+        
+        # Convertir imágenes a base64 para enviar al cliente
+        def img_to_base64(img_array):
+            """Convierte array numpy a imagen PNG base64"""
+            from PIL import Image
+            
+            # Asegurar que está en formato uint8
+            if img_array.dtype != np.uint8:
+                if img_array.dtype == np.float32 or img_array.dtype == np.float64:
+                    img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+                else:
+                    img_array = img_array.astype(np.uint8)
+            
+            if len(img_array.shape) == 2:  # Escala de grises
+                img = Image.fromarray(img_array, mode='L')
+            elif len(img_array.shape) == 3 and img_array.shape[2] == 3:  # RGB
+                img = Image.fromarray(img_array, mode='RGB')
+            else:
+                raise ValueError(f"Formato de imagen no soportado: {img_array.shape}")
+            
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG')
+            img_base64 = base64.b64encode(buffer.getvalue()).decode()
+            return f'data:image/png;base64,{img_base64}'
+        
+        # Preparar visualización DCT (convertir a uint8 si es necesario)
+        dct_visual = results['dct_visual']
+        if dct_visual.dtype == np.float32 or dct_visual.dtype == np.float64:
+            dct_visual = (dct_visual * 255).astype(np.uint8)
+        
+        # Limpiar archivo temporal
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return jsonify({
+            'success': True,
+            'grayscale': img_to_base64(results['grayscale']),
+            'dct_magnitude': img_to_base64(dct_visual),
+            'reconstructed': img_to_base64(results['imagen_gris_reconstruida']),
+            'reconstructed_color': img_to_base64(results['imagen_color_reconstruida']),
+            'shape': results['shape'],
+            'filter_percent': results['filter_percent'],
+            'coeficientes_conservados': results['coeficientes_conservados']
+        })
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Error procesando imagen: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     print(f"🎤 Aplicación iniciada. Modelos cargados: {list(models.keys())}")
     print(f"📊 Parámetros: FS={FS} Hz, TARGET_N={TARGET_N}")

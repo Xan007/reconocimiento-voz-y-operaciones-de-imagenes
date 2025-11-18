@@ -1,0 +1,915 @@
+{% extends "base.html" %}
+
+{% block title %}Procesamiento de Imágenes con DCT 2D{% endblock %}
+
+{% block content %}
+<div class="images-container">
+    <h1>Procesamiento de Imágenes con DCT 2D + Acciones por Voz</h1>
+    <p class="subtitle">Carga una imagen, procésala y ejecuta acciones mediante reconocimiento de voz</p>
+    
+    <!-- Sección de comandos y acciones -->
+    <div class="commands-actions-section">
+        <h2>Acciones Disponibles</h2>
+        <div class="commands-grid">
+            <div class="command-card">
+                <div class="command-icon" style="background: linear-gradient(135deg, #0066cc, #004499);">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <h4>Comando "UNO"</h4>
+                <p class="action-text" id="action-uno">Acción: Descargar Imagen Original</p>
+            </div>
+            <div class="command-card">
+                <div class="command-icon" style="background: linear-gradient(135deg, #16a34a, #15803d);">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <h4>Comando "DOS"</h4>
+                <p class="action-text" id="action-dos">Acción: Descargar DCT Filtrado</p>
+            </div>
+            <div class="command-card">
+                <div class="command-icon" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <h4>Comando "TRES"</h4>
+                <p class="action-text" id="action-tres">Acción: Descargar Imagen Inversa</p>
+            </div>
+        </div>
+
+        <!-- Reconocimiento en vivo -->
+        <div class="recognition-box">
+            <div class="recognition-status" id="recognitionStatus">
+                <i class="fas fa-circle-stop"></i>
+                <span>Reconocimiento de Voz: Inactivo</span>
+            </div>
+            <div class="recognition-result" id="recognitionResult"></div>
+        </div>
+    </div>
+
+    <!-- Sección de carga -->
+    <div class="upload-section">
+        <div class="upload-card">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h3>Cargar Imagen</h3>
+            <input type="file" id="imageInput" accept="image/*" class="file-input">
+            <label for="imageInput" class="upload-button">
+                <i class="fas fa-plus"></i> Seleccionar Imagen
+            </label>
+            <p class="file-info" id="fileInfo">Formatos: JPG, PNG, BMP, GIF</p>
+        </div>
+    </div>
+
+    <!-- Control de filtrado -->
+    <div class="filter-control-section" id="filterControlSection" style="display: none;">
+        <div class="filter-box">
+            <h3>Control de Compresión DCT</h3>
+            <div class="slider-container">
+                <label for="filterSlider">Porcentaje de Compresión: <span id="filterValue">0</span>%</label>
+                <input type="range" id="filterSlider" min="0" max="100" value="0" class="filter-slider">
+                <div class="filter-description">
+                    <small>0% = Sin compresión (imagen original) | 100% = Máxima compresión (solo coef. más importantes)</small>
+                </div>
+            </div>
+            <button id="applyFilterBtn" class="btn btn-primary">
+                <i class="fas fa-check"></i> Aplicar Compresión
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de progreso -->
+    <div id="processingBar" class="processing-bar hidden">
+        <div class="spinner"></div>
+        <span>Procesando imagen...</span>
+    </div>
+
+    <!-- Sección de resultados -->
+    <div id="resultsSection" class="results-section hidden">
+        <h2>Resultados del Procesamiento</h2>
+        
+        <!-- Información de la imagen -->
+        <div class="info-box">
+            <p><strong>Dimensiones:</strong> <span id="imageDim"></span></p>
+            <p><strong>Filtrado:</strong> <span id="filterInfo">100%</span></p>
+            <p><strong>Pipeline:</strong> Cargar → Escala de Grises → DCT 2D → Invertir DCT</p>
+        </div>
+
+        <!-- Grid de imágenes -->
+        <div class="images-grid">
+            <!-- Imagen 1: Escala de grises -->
+            <div class="image-card">
+                <div class="image-wrapper">
+                    <img id="grayImg" src="" alt="Imagen en Escala de Grises">
+                </div>
+                <h4>Paso 1: Escala de Grises</h4>
+                <p>Original convertida a B&W</p>
+            </div>
+
+            <!-- Imagen 2: DCT Magnitud -->
+            <div class="image-card">
+                <div class="image-wrapper">
+                    <img id="dctImg" src="" alt="Magnitud DCT 2D">
+                </div>
+                <h4>Paso 2: Magnitud DCT 2D</h4>
+                <p>Coeficientes visualizados en escala logarítmica</p>
+            </div>
+
+            <!-- Imagen 3: Reconstruida (gris) -->
+            <div class="image-card">
+                <div class="image-wrapper">
+                    <img id="reconstructImg" src="" alt="Imagen Reconstruida">
+                </div>
+                <h4>Paso 3: DCT Inversa (Gris)</h4>
+                <p id="compressionInfo">Compresión aplicada</p>
+            </div>
+
+            <!-- Imagen 4: Reconstruida (color) -->
+            <div class="image-card">
+                <div class="image-wrapper">
+                    <img id="reconstructColorImg" src="" alt="Imagen Reconstruida Color">
+                </div>
+                <h4>Paso 3b: DCT Inversa (Color)</h4>
+                <p>Reconstrucción a partir de todos los canales RGB</p>
+            </div>
+
+            <!-- Imagen 5: Comparación Gris -->
+            <div class="image-card full-width-comparison">
+                <div class="comparison-container">
+                    <div class="comparison-item">
+                        <img id="comparisonOriginal" src="" alt="Original" class="comparison-img">
+                        <label>Original (Gris)</label>
+                    </div>
+                    <div class="comparison-separator">
+                        <span>vs</span>
+                    </div>
+                    <div class="comparison-item">
+                        <img id="comparisonReconstruido" src="" alt="Reconstruido" class="comparison-img">
+                        <label id="comparisonLabel">Reconstruido</label>
+                    </div>
+                </div>
+                <h4>Paso 4: Comparación de Compresión (Escala de Grises)</h4>
+                <p id="coefInfo">Observa la diferencia: ajusta el slider para más o menos compresión</p>
+            </div>
+        </div>
+
+        <!-- Botones de descarga y limpiar -->
+        <div class="action-buttons">
+            <button id="downloadOriginal" class="btn btn-primary">
+                <i class="fas fa-download"></i> Descargar Original
+            </button>
+            <button id="downloadFiltered" class="btn btn-primary">
+                <i class="fas fa-download"></i> Descargar Filtrado
+            </button>
+            <button id="downloadInverted" class="btn btn-primary">
+                <i class="fas fa-download"></i> Descargar Inverso
+            </button>
+            <button id="clearBtn" class="btn btn-secondary">
+                <i class="fas fa-trash"></i> Limpiar
+            </button>
+        </div>
+    </div>
+
+    <!-- Sección de información -->
+    <div class="info-section">
+        <h3>¿Qué es DCT 2D?</h3>
+        <p>
+            La Transformada Discreta del Coseno (DCT) tipo 2 en 2D es una técnica de compresión y análisis de imágenes.
+            Convierte la imagen del dominio espacial al dominio de frecuencias, permitiendo:
+        </p>
+        <ul>
+            <li><strong>Compresión:</strong> Muchos coeficientes DCT de alta frecuencia pueden ser descartados</li>
+            <li><strong>Filtrado:</strong> Eliminar ruido modificando coeficientes específicos</li>
+            <li><strong>Análisis:</strong> Entender la composición de frecuencias de la imagen</li>
+        </ul>
+        <p>
+            El pipeline mostrado aquí demuestra cómo se puede transformar una imagen a escala de grises,
+            calcular su DCT 2D, aplicar filtrado adaptativo e invertir la transformación.
+        </p>
+    </div>
+</div>
+
+<style>
+.images-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.images-container h1 {
+    color: #0066cc;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+/* Sección de comandos */
+.commands-actions-section {
+    background: linear-gradient(135deg, #f5f9ff 0%, #f0f8ff 100%);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 40px;
+    border: 1px solid #ddd;
+}
+
+.commands-actions-section h2 {
+    color: #0066cc;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.commands-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.command-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.command-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.command-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 28px;
+    margin: 0 auto 15px;
+}
+
+.command-card h4 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.action-text {
+    color: #666;
+    font-size: 13px;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Recognition box */
+.recognition-box {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    border: 2px solid #0066cc;
+}
+
+.recognition-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #666;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.recognition-status i {
+    color: #999;
+    font-size: 18px;
+}
+
+.recognition-status.active i {
+    color: #16a34a;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.recognition-result {
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    text-align: center;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0066cc;
+    font-weight: 600;
+}
+
+/* Filter control */
+.filter-control-section {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.filter-box h3 {
+    color: #0066cc;
+    margin-bottom: 20px;
+}
+
+.slider-container {
+    margin-bottom: 20px;
+}
+
+.slider-container label {
+    display: block;
+    margin-bottom: 10px;
+    color: #333;
+    font-weight: 600;
+}
+
+.filter-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    margin-bottom: 10px;
+}
+
+.filter-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0066cc;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.3);
+}
+
+.filter-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #0066cc;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.3);
+}
+
+.filter-description {
+    color: #999;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+/* Sección de carga */
+.upload-section {
+    margin-bottom: 40px;
+    display: flex;
+    justify-content: center;
+}
+
+.upload-card {
+    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 102, 204, 0.2);
+    max-width: 400px;
+    width: 100%;
+}
+
+.upload-card i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.9;
+}
+
+.upload-card h3 {
+    margin-bottom: 20px;
+    font-size: 20px;
+}
+
+.file-input {
+    display: none;
+}
+
+.upload-button {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 12px 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.upload-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: white;
+    transform: translateY(-2px);
+}
+
+.file-info {
+    margin-top: 15px;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Barra de progreso */
+.processing-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    padding: 20px;
+    background: #f0f8ff;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    border-left: 4px solid #0066cc;
+}
+
+.processing-bar.hidden {
+    display: none;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid #e0e0e0;
+    border-top-color: #0066cc;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Grid de imágenes */
+.images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.image-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.image-card.full-width-comparison {
+    grid-column: 1 / -1;
+}
+
+.image-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.image-wrapper {
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.comparison-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    min-height: 350px;
+}
+
+.comparison-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.comparison-img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-item label {
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+}
+
+.comparison-separator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0066cc, #004499);
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.image-card h4 {
+    color: #0066cc;
+    margin: 15px;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.image-card p {
+    color: #666;
+    font-size: 12px;
+    margin: 0 15px 15px;
+    line-height: 1.4;
+}
+
+/* Botones de acción */
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 12px 30px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0066cc, #004499);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+/* Sección de información */
+.info-box {
+    background: #f9f9f9;
+    border-left: 4px solid #0066cc;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    font-size: 13px;
+}
+
+.info-box p {
+    margin: 5px 0;
+}
+
+.info-section {
+    background: #f5f9ff;
+    border-radius: 12px;
+    padding: 30px;
+    border: 1px solid #ddd;
+}
+
+.info-section h3 {
+    color: #0066cc;
+    margin-bottom: 15px;
+}
+
+.info-section p {
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.info-section ul {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 15px;
+}
+
+.info-section li {
+    color: #555;
+    padding: 8px 0;
+    padding-left: 25px;
+    position: relative;
+}
+
+.info-section li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #0066cc;
+    font-weight: bold;
+}
+
+/* Sección de resultados */
+.results-section {
+    animation: fadeIn 0.3s ease;
+}
+
+.results-section.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .commands-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .images-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .upload-card {
+        padding: 30px 20px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+// Almacenar datos de la imagen actual
+let currentImageData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const imageInput = document.getElementById('imageInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const processingBar = document.getElementById('processingBar');
+    const resultsSection = document.getElementById('resultsSection');
+    const filterControlSection = document.getElementById('filterControlSection');
+    const clearBtn = document.getElementById('clearBtn');
+    const filterSlider = document.getElementById('filterSlider');
+    const filterValue = document.getElementById('filterValue');
+    const applyFilterBtn = document.getElementById('applyFilterBtn');
+    const downloadOriginal = document.getElementById('downloadOriginal');
+    const downloadFiltered = document.getElementById('downloadFiltered');
+    const downloadInverted = document.getElementById('downloadInverted');
+    
+    imageInput.addEventListener('change', handleImageUpload);
+    clearBtn.addEventListener('click', handleClear);
+    filterSlider.addEventListener('input', updateFilterValue);
+    applyFilterBtn.addEventListener('click', applyFilter);
+    downloadOriginal.addEventListener('click', () => downloadImage('original'));
+    downloadFiltered.addEventListener('click', () => downloadImage('filtered'));
+    downloadInverted.addEventListener('click', () => downloadImage('inverted'));
+    
+    // Inicializar reconocimiento de voz
+    initializeVoiceRecognition();
+    
+    function updateFilterValue(e) {
+        filterValue.textContent = e.target.value;
+    }
+    
+    async function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('La imagen es demasiado grande. Máximo 10MB.');
+            return;
+        }
+        
+        fileInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        filterControlSection.style.display = 'block';
+        currentImageData = file;
+        
+        await processImage(file, 0);
+    }
+    
+    async function processImage(file, filterPercent) {
+        processingBar.classList.remove('hidden');
+        resultsSection.classList.add('hidden');
+        
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('filter_percent', filterPercent);
+            
+            console.log(`Enviando: comprensión=${filterPercent}%`);
+            
+            const response = await fetch('/api/process-image', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error procesando imagen');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error);
+            }
+            
+            console.log(`Respuesta: ${data.coeficientes_conservados} coeficientes conservados`);
+            
+            // Mostrar todas las imágenes
+            document.getElementById('grayImg').src = data.grayscale;
+            document.getElementById('dctImg').src = data.dct_magnitude;
+            document.getElementById('reconstructImg').src = data.reconstructed;
+            document.getElementById('reconstructColorImg').src = data.reconstructed_color;
+            
+            // Comparación
+            document.getElementById('comparisonOriginal').src = data.grayscale;
+            document.getElementById('comparisonReconstruido').src = data.reconstructed;
+            
+            // Información
+            document.getElementById('imageDim').textContent = `${data.shape[0]} × ${data.shape[1]} píxeles`;
+            document.getElementById('filterInfo').textContent = `${data.filter_percent}%`;
+            document.getElementById('compressionInfo').textContent = `Compresión: ${data.filter_percent}% | Coef. conservados: ${data.coeficientes_conservados}`;
+            document.getElementById('comparisonLabel').textContent = `Reconstruido (${data.filter_percent}%)`;
+            document.getElementById('coefInfo').textContent = `Coeficientes conservados: ${data.coeficientes_conservados} | Compresión: ${data.filter_percent}%`;
+            
+            processingBar.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+        } catch (error) {
+            processingBar.classList.add('hidden');
+            alert('Error: ' + error.message);
+            console.error('Error:', error);
+        }
+    }
+    
+    async function applyFilter() {
+        if (!currentImageData) {
+            alert('Por favor carga una imagen primero');
+            return;
+        }
+        
+        const filterPercent = parseInt(filterSlider.value);
+        await processImage(currentImageData, filterPercent);
+    }
+    
+    function handleClear() {
+        imageInput.value = '';
+        fileInfo.textContent = 'Formatos: JPG, PNG, BMP, GIF';
+        filterControlSection.style.display = 'none';
+        resultsSection.classList.add('hidden');
+        currentImageData = null;
+    }
+    
+    function downloadImage(type) {
+        let imgElement, filename;
+        
+        switch(type) {
+            case 'original':
+                imgElement = document.getElementById('reconstructImg');
+                filename = 'imagen_sin_filtrado.png';
+                break;
+            case 'filtered':
+                imgElement = document.getElementById('reconstructFilteredImg');
+                filename = 'imagen_con_filtrado.png';
+                break;
+            case 'inverted':
+                imgElement = document.getElementById('comparisonFiltered');
+                filename = 'imagen_comparacion.png';
+                break;
+        }
+        
+        if (!imgElement || !imgElement.src) return;
+        
+        const link = document.createElement('a');
+        link.href = imgElement.src;
+        link.download = filename;
+        link.click();
+    }
+    
+    function initializeVoiceRecognition() {
+        const recognitionStatus = document.getElementById('recognitionStatus');
+        const recognitionResult = document.getElementById('recognitionResult');
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            recognitionResult.innerHTML = '⚠️ Reconocimiento de voz no soportado en este navegador';
+            return;
+        }
+        
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.lang = 'es-ES';
+        
+        recognition.onstart = () => {
+            recognitionStatus.classList.add('active');
+            recognitionStatus.innerHTML = '<i class="fas fa-circle"></i><span>Escuchando...</span>';
+        };
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+            recognitionResult.innerHTML = `<strong>Detectado:</strong> "${transcript}"`;
+            
+            // Detectar comandos
+            if (transcript.includes('uno')) {
+                recognitionResult.innerHTML += '<br>✓ Descargando imagen original...';
+                setTimeout(() => downloadImage('original'), 500);
+            } else if (transcript.includes('dos')) {
+                recognitionResult.innerHTML += '<br>✓ Descargando imagen filtrada...';
+                setTimeout(() => downloadImage('filtered'), 500);
+            } else if (transcript.includes('tres')) {
+                recognitionResult.innerHTML += '<br>✓ Descargando imagen inversa...';
+                setTimeout(() => downloadImage('inverted'), 500);
+            }
+        };
+        
+        recognition.onerror = (event) => {
+            recognitionStatus.classList.remove('active');
+            recognitionResult.innerHTML = `❌ Error: ${event.error}`;
+        };
+        
+        recognition.onend = () => {
+            recognitionStatus.classList.remove('active');
+            recognitionStatus.innerHTML = '<i class="fas fa-circle-stop"></i><span>Reconocimiento de Voz: Inactivo</span>';
+        };
+        
+        // Botón para iniciar reconocimiento
+        recognitionStatus.addEventListener('click', () => {
+            if (recognitionStatus.classList.contains('active')) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        });
+        
+        recognitionStatus.style.cursor = 'pointer';
+    }
+});
+</script>
+
+{% endblock %}
