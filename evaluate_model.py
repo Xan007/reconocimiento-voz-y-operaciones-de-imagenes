@@ -13,9 +13,10 @@ from pathlib import Path
 from processing.audio_utils import read_wav, pad_or_trim, normalize_audio
 from processing.fft_utils import analyze_signal
 from recognition.recognizer import load_models, compare_with_models
+from recognition.distance_metrics import AVAILABLE_METRICS, METRIC_NAMES
 from config import COMANDOS_DIR, MODELOS_DIR
 
-def evaluate_model():
+def evaluate_model(distance_method='euclidean'):
     """
     Evalúa el modelo usando todos los archivos de entrenamiento.
     
@@ -24,14 +25,25 @@ def evaluate_model():
         a) Cargar todas las grabaciones
         b) Para cada grabación:
             - Calcular energía (como si fuera entrada)
-            - Comparar con modelos
+            - Comparar con modelos usando el método de distancia especificado
             - Registrar si la predicción fue correcta
     2. Calcular porcentaje de acierto total
     3. Mostrar resultados por comando y general
+    
+    Parámetros:
+    -----------
+    distance_method : str
+        Método de distancia a usar: 'euclidean', 'weighted_euclidean', 
+        'mahalanobis_diagonal', 'nll_gaussian', 'downweight_unstable', 'outlier_detection'
+    
+    Retorna:
+    --------
+    results : dict
+        Diccionario con estadísticas de evaluación
     """
     
     print("\n" + "="*70)
-    print("EVALUADOR DE MODELOS - CÁLCULO DE MARGEN DE ERROR")
+    print(f"EVALUADOR DE MODELOS - MÉTODO: {METRIC_NAMES.get(distance_method, distance_method)}")
     print("="*70)
     
     # Verificar que existen modelos
@@ -113,7 +125,7 @@ def evaluate_model():
                 _, _, energies = analyze_signal(x)
                 
                 # Comparar con modelos
-                prediccion, diffs = compare_with_models(energies, models)
+                prediccion, diffs = compare_with_models(energies, models, distance_method=distance_method)
                 
                 # Verificar si fue correcto
                 correcto = (prediccion == comando_real)
@@ -195,6 +207,7 @@ def evaluate_model():
     results['total_aciertos'] = total_aciertos
     results['total_evaluaciones'] = total_evaluaciones
     results['porcentaje_acierto'] = porcentaje_general
+    results['distance_method'] = distance_method
     
     return results
 
@@ -244,12 +257,88 @@ def show_confusion_matrix(results):
     print("="*70)
 
 
+def evaluate_all_methods():
+    """
+    Evalúa el modelo con TODOS los métodos de distancia disponibles
+    y compara sus resultados.
+    
+    Retorna:
+    --------
+    all_results : dict
+        Diccionario con resultados para cada método de distancia
+    """
+    print("\n" + "="*70)
+    print("EVALUACIÓN COMPARATIVA - TODOS LOS MÉTODOS DE DISTANCIA")
+    print("="*70 + "\n")
+    
+    all_results = {}
+    
+    # Evaluar con cada método disponible
+    for method_name in sorted(AVAILABLE_METRICS.keys()):
+        print(f"\n🔄 Evaluando con: {METRIC_NAMES.get(method_name, method_name)}")
+        print("-"*70)
+        
+        results = evaluate_model(distance_method=method_name)
+        
+        if results:
+            all_results[method_name] = results
+            error_margin = 100.0 - results['porcentaje_acierto']
+            print(f"\n   📊 Margen de error: {error_margin:.2f}%")
+    
+    # Mostrar comparación
+    print("\n\n" + "="*70)
+    print("COMPARACIÓN DE MÉTODOS")
+    print("="*70 + "\n")
+    
+    if all_results:
+        # Crear tabla de comparación
+        print(f"{'Método':30s} | {'Aciertos':10s} | {'Porcentaje':12s} | {'Margen Error':12s}")
+        print("-" * 68)
+        
+        # Ordenar por margen de error (menor es mejor)
+        sorted_methods = sorted(
+            all_results.items(),
+            key=lambda x: 100.0 - x[1]['porcentaje_acierto']
+        )
+        
+        best_method = None
+        best_error = float('inf')
+        
+        for i, (method_name, results) in enumerate(sorted_methods, 1):
+            accuracy = results['porcentaje_acierto']
+            error = 100.0 - accuracy
+            total = results['total_evaluaciones']
+            aciertos = results['total_aciertos']
+            
+            badge = "🏆 MEJOR" if i == 1 else "    "
+            
+            print(f"{METRIC_NAMES.get(method_name, method_name):30s} | "
+                  f"{aciertos:2d}/{total:2d} ({aciertos:2d}) | "
+                  f"{accuracy:6.2f}% | "
+                  f"{error:6.2f}%  {badge}")
+            
+            if error < best_error:
+                best_error = error
+                best_method = method_name
+        
+        print("="*68)
+        print(f"\n✅ Mejor método: {METRIC_NAMES.get(best_method, best_method)} "
+              f"(margen de error: {best_error:.2f}%)\n")
+    
+    return all_results
+
+
 if __name__ == "__main__":
     try:
-        results = evaluate_model()
-        if results:
-            show_confusion_matrix(results)
-            print("\n✅ Evaluación completada")
+        # Opción: evaluar con todos los métodos
+        all_results = evaluate_all_methods()
+        
+        # O si lo prefieres, evaluar con un método específico:
+        # results = evaluate_model(distance_method='weighted_euclidean')
+        # if results:
+        #     show_confusion_matrix(results)
+        
+        print("\n✅ Evaluación completada")
     except KeyboardInterrupt:
         print("\n\n⚠️  Evaluación interrumpida por el usuario")
     except Exception as e:

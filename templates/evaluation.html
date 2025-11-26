@@ -6,10 +6,51 @@
         <h2>Evaluación de Modelos</h2>
         <p>Calcula el margen de error usando todos los archivos de entrenamiento. Se ingresa cada grabación como entrada y se verifica si la predicción coincide con el comando real (determinado por la carpeta).</p>
         
+        <!-- Selector de método de distancia -->
+        <div class="method-selector-section">
+            <h3>Selecciona Método de Distancia</h3>
+            <div class="method-selector">
+                <label class="radio-option">
+                    <input type="radio" name="distanceMethod" value="euclidean" checked>
+                    <span class="radio-label">
+                        <strong>Euclidiana (Línea Base)</strong>
+                        <small>Distancia clásica sin usar std_energy</small>
+                    </span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="distanceMethod" value="weighted_euclidean">
+                    <span class="radio-label">
+                        <strong>Euclidiana Ponderada</strong>
+                        <small>Bandas estables contribuyen más</small>
+                    </span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="distanceMethod" value="nll_gaussian">
+                    <span class="radio-label">
+                        <strong>Verosimilitud Gaussiana</strong>
+                        <small>Probabilidad gaussiana (mejor si menor)</small>
+                    </span>
+                </label>
+                <label class="radio-option full-width">
+                    <input type="radio" name="distanceMethod" value="all">
+                    <span class="radio-label compare-all">
+                        <strong>🔄 Comparar Todos los Métodos</strong>
+                        <small>Evalúa todos y muestra comparación</small>
+                    </span>
+                </label>
+            </div>
+        </div>
+        
         <button id="evaluateBtn" class="btn-evaluate">Iniciar Evaluación</button>
         
         <div id="evaluationStatus" class="status-message" style="display:none;"></div>
         <div id="loadingSpinner" class="spinner" style="display:none;"></div>
+    </div>
+    
+    <!-- Sección de comparación de métodos -->
+    <div id="comparisonContainer" class="evaluation-card" style="display:none;">
+        <h2>📊 Comparación de Métodos</h2>
+        <div id="comparisonTable" class="comparison-table"></div>
     </div>
     
     <div id="resultsContainer" style="display:none;">
@@ -82,6 +123,93 @@
     line-height: 1.5;
 }
 
+/* Estilos para selector de método */
+.method-selector-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e8eef7 100%);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.method-selector-section h3 {
+    color: var(--primary);
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.method-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 0.9rem;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-option:hover {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, #f8f9fa 0%, #f0f5ff 100%);
+}
+
+.radio-option input[type="radio"] {
+    margin-top: 0.15rem;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.radio-option input[type="radio"]:checked + .radio-label strong {
+    color: var(--primary);
+}
+
+.radio-option input[type="radio"]:checked ~ .radio-label {
+    color: var(--primary);
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+    color: var(--primary);
+}
+
+.radio-option.checked {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, #e8eef7 0%, #dde9f6 100%);
+}
+
+.radio-label {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.radio-label strong {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.radio-label small {
+    font-size: 0.8rem;
+    color: var(--gray);
+}
+
+.radio-option.full-width {
+    grid-column: 1 / -1;
+}
+
+.radio-label.compare-all strong {
+    color: #16a34a;
+    font-size: 1rem;
+}
+
 .btn-evaluate {
     width: 100%;
     padding: 1.2rem;
@@ -142,6 +270,67 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Tabla de comparación */
+.comparison-table {
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+
+.comparison-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.comparison-table table th {
+    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+    color: white;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.2);
+}
+
+.comparison-table table th:first-child {
+    text-align: left;
+}
+
+.comparison-table table td {
+    padding: 0.8rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
+}
+
+.comparison-table table td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.comparison-table table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.comparison-table table tbody tr.best-method {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-left: 4px solid #22c55e;
+    font-weight: 600;
+}
+
+.comparison-table .badge-best {
+    display: inline-block;
+    background: #22c55e;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
 .summary-section {
@@ -315,6 +504,10 @@ table td[data-correct="true"] {
     .summary-stats {
         grid-template-columns: 1fr;
     }
+    
+    .method-selector {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
@@ -323,9 +516,34 @@ const evaluateBtn = document.getElementById('evaluateBtn');
 const evaluationStatus = document.getElementById('evaluationStatus');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const resultsContainer = document.getElementById('resultsContainer');
+const comparisonContainer = document.getElementById('comparisonContainer');
+const distanceMethodRadios = document.querySelectorAll('input[name="distanceMethod"]');
+
+// Detectar cambios en las opciones de radio
+distanceMethodRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        // Actualizar UI del selector
+        document.querySelectorAll('.radio-option').forEach(opt => {
+            if (opt.querySelector('input:checked')) {
+                opt.classList.add('checked');
+            } else {
+                opt.classList.remove('checked');
+            }
+        });
+    });
+});
 
 evaluateBtn.addEventListener('click', async () => {
-    if (!confirm('¿Ejecutar evaluación? Esto procesará todas las grabaciones y puede tomar unos minutos...')) {
+    const selectedMethod = document.querySelector('input[name="distanceMethod"]:checked').value;
+    
+    let confirmMsg = '';
+    if (selectedMethod === 'all') {
+        confirmMsg = '¿Ejecutar evaluación con TODOS los métodos? Esto puede tomar varios minutos...';
+    } else {
+        confirmMsg = '¿Ejecutar evaluación? Esto procesará todas las grabaciones...';
+    }
+    
+    if (!confirm(confirmMsg)) {
         return;
     }
     
@@ -334,17 +552,23 @@ evaluateBtn.addEventListener('click', async () => {
     loadingSpinner.style.display = 'inline-block';
     evaluationStatus.style.display = 'none';
     resultsContainer.style.display = 'none';
+    comparisonContainer.style.display = 'none';
     
     try {
         const response = await fetch('/api/evaluate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ distance_method: selectedMethod })
         });
         
         const data = await response.json();
         
         if (data.success) {
-            showResults(data.results);
+            if (selectedMethod === 'all' && data.all_results) {
+                showComparison(data);
+            } else if (data.results) {
+                showResults(data.results);
+            }
             showStatus('✓ Evaluación completada exitosamente', 'success');
         } else {
             showStatus('✗ Error: ' + data.error, 'error');
@@ -362,6 +586,60 @@ function showStatus(message, type) {
     evaluationStatus.textContent = message;
     evaluationStatus.className = 'status-message ' + type;
     evaluationStatus.style.display = 'block';
+}
+
+function showComparison(data) {
+    const allResults = data.all_results;
+    const bestMethod = data.best_method;
+    const methodNames = {
+        'euclidean': 'Euclidiana (Línea Base)',
+        'weighted_euclidean': 'Euclidiana Ponderada',
+        'nll_gaussian': 'Verosimilitud Gaussiana'
+    };
+    
+    // Crear tabla de comparación
+    let html = '<table><thead><tr>' +
+        '<th>Método</th>' +
+        '<th>Aciertos</th>' +
+        '<th>% Acierto</th>' +
+        '<th>% Error</th>' +
+        '<th>Estado</th>' +
+        '</tr></thead><tbody>';
+    
+    // Ordenar métodos por error (menor es mejor)
+    const sortedMethods = Object.entries(allResults).sort((a, b) => {
+        return a[1].margen_error - b[1].margen_error;
+    });
+    
+    sortedMethods.forEach((entry, index) => {
+        const method = entry[0];
+        const result = entry[1];
+        const methodName = methodNames[method] || method;
+        const isBest = method === bestMethod;
+        
+        const rowClass = isBest ? 'best-method' : '';
+        const badge = isBest ? '<span class="badge-best">🏆 MEJOR</span>' : '';
+        
+        html += `<tr class="${rowClass}">
+            <td>${methodName}</td>
+            <td>${result.total_aciertos}/${result.total_evaluaciones}</td>
+            <td>${result.porcentaje_acierto.toFixed(2)}%</td>
+            <td>${result.margen_error.toFixed(2)}%</td>
+            <td>${badge}</td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table>';
+    
+    document.getElementById('comparisonTable').innerHTML = html;
+    comparisonContainer.style.display = 'block';
+    
+    // Mostrar también resultados del mejor método
+    if (allResults[bestMethod]) {
+        showResults(allResults[bestMethod]);
+    }
+    
+    comparisonContainer.scrollIntoView({ behavior: 'smooth' });
 }
 
 function showResults(results) {
@@ -392,8 +670,10 @@ function showResults(results) {
         }
     }
     
-    // Matriz de confusión
-    buildConfusionMatrix(results.predicciones);
+    // Matriz de confusión (si están disponibles las predicciones)
+    if (results.predicciones) {
+        buildConfusionMatrix(results.predicciones);
+    }
     
     resultsContainer.style.display = 'block';
     // Scroll hacia resultados

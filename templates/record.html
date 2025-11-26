@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<script src="{{ url_for('static', filename='js/audio-config.js') }}"></script>
+
 <div class="record-wrapper">
     <div class="record-card">
         <h2>Grabar Datos de Entrenamiento</h2>
@@ -367,11 +369,15 @@ function encodeWAV(samples, sampleRate) {
 // Solicitar permiso de micrófono
 async function requestMicrophonePermission() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await requestMicrophoneAccess();
+        if (!stream) {
+            showStatus('Error: No hay permiso para usar el micrófono', 'error');
+            return false;
+        }
         stream.getTracks().forEach(track => track.stop());
         return true;
     } catch (error) {
-        showStatus('Error: No hay permiso para usar el micrófono', 'error');
+        showStatus('Error: ' + error.message, 'error');
         return false;
     }
 }
@@ -392,7 +398,11 @@ recordBtn.addEventListener('click', async () => {
     if (!hasPermission) return;
     
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await requestMicrophoneAccess();
+        if (!stream) {
+            showStatus('Error: No se pudo acceder al micrófono', 'error');
+            return;
+        }
         
         // Usar Web Audio API para mejor control
         audioContext = new (window.AudioContext || window.webkitAudioContext)();

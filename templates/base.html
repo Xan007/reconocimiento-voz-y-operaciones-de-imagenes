@@ -9,13 +9,18 @@
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar" id="mainNavbar">
         <div class="navbar-container">
             <div class="navbar-brand">
                 <i class="fas fa-microphone"></i>
                 <span>Reconocedor de Comandos FFT</span>
             </div>
-            <div class="navbar-menu">
+
+            <button id="navToggle" aria-expanded="true" aria-label="Alternar navegación" class="btn btn-primary" style="margin-left:12px;">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="navbar-menu" id="navbarMenu">
                 <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
                     <i class="fas fa-wave-square"></i> Reconocimiento en Tiempo Real
                 </a>
@@ -28,11 +33,17 @@
                 <a href="/images" class="nav-link {% if request.path == '/images' %}active{% endif %}">
                     <i class="fas fa-image"></i> Procesamiento de Imágenes
                 </a>
+                <a href="/image-processing" class="nav-link {% if request.path == '/image-processing' %}active{% endif %}">
+                    <i class="fas fa-microphone"></i> Procesamiento Interactivo
+                </a>
                 <a href="/evaluation" class="nav-link {% if request.path == '/evaluation' %}active{% endif %}">
                     <i class="fas fa-check-double"></i> Evaluación
                 </a>
                 <a href="/training" class="nav-link {% if request.path == '/training' %}active{% endif %}">
                     <i class="fas fa-dumbbell"></i> Entrenar
+                </a>
+                <a href="/settings" class="nav-link {% if request.path == '/settings' %}active{% endif %}">
+                    <i class="fas fa-cog"></i> Configuración
                 </a>
             </div>
         </div>
@@ -58,6 +69,64 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
+
+    <script>
+    // Collapsible header toggle with persistence
+    (function() {
+        const toggle = document.getElementById('navToggle');
+        const menu = document.getElementById('navbarMenu');
+        const navbar = document.getElementById('mainNavbar');
+        const STORAGE_KEY = 'navbar_collapsed';
+
+        function setCollapsed(collapsed) {
+            if (collapsed) {
+                menu.style.maxHeight = '0';
+                menu.style.overflow = 'hidden';
+                toggle.setAttribute('aria-expanded', 'false');
+                navbar.classList.add('collapsed');
+                localStorage.setItem(STORAGE_KEY, '1');
+            } else {
+                menu.style.maxHeight = '';
+                menu.style.overflow = '';
+                toggle.setAttribute('aria-expanded', 'true');
+                navbar.classList.remove('collapsed');
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        }
+
+        // Initialize state from storage
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored === '1') setCollapsed(true);
+        } catch (e) {
+            console.warn('No se pudo leer estado del navbar:', e);
+        }
+
+        // Toggle handler (also swap icon)
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                const isCollapsed = navbar.classList.contains('collapsed');
+                setCollapsed(!isCollapsed);
+                // swap icon
+                const icon = toggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-bars', isCollapsed);
+                    icon.classList.toggle('fa-times', !isCollapsed);
+                }
+            });
+        }
+
+        // Ensure icon matches initial state
+        (function syncIcon() {
+            const icon = toggle.querySelector('i');
+            if (!icon) return;
+            const isCollapsed = navbar.classList.contains('collapsed');
+            icon.classList.toggle('fa-bars', !isCollapsed);
+            icon.classList.toggle('fa-times', isCollapsed);
+        })();
+    })();
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

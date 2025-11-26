@@ -1,0 +1,2192 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="{{ url_for('static', filename='js/audio-config.js') }}"></script>
+
+<style>
+/* AUDIO MODAL - COMPACTO */
+.audio-modal {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid #0066cc;
+}
+
+.audio-modal.hidden {
+    display: none !important;
+}
+
+.audio-modal-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.audio-modal-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: #0066cc;
+    flex: 1;
+}
+
+.dropdown-toggle {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #0066cc;
+    transition: transform 0.3s ease;
+}
+
+.dropdown-toggle:hover {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    width: 100%;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #e0e0e0;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 200px;
+    }
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #0066cc;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: white;
+    box-shadow: 0 2px 6px rgba(0, 102, 204, 0.1);
+}
+
+.dropdown-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #0066cc;
+}
+
+.dropdown-item input[type="checkbox"]:checked + span {
+    color: #22c55e;
+}
+
+.recording-button {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 3px solid #0066cc;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+}
+
+.recording-button:hover:not(.recording) {
+    background: #f0f7ff;
+    transform: scale(1.05);
+}
+
+.recording-button.recording {
+    background: #ff3333;
+    border-color: #ff3333;
+    animation: pulse-recording 0.8s infinite;
+}
+
+@keyframes pulse-recording {
+    0% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0.7); }
+    50% { box-shadow: 0 0 0 15px rgba(255, 51, 51, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0); }
+}
+
+.recording-timer {
+    font-weight: bold;
+    color: #ff3333;
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.audio-status {
+    font-size: 12px;
+    color: #555;
+    text-align: center;
+    min-height: 16px;
+    font-weight: 500;
+}
+</style>
+
+<div class="image-processor-wrapper">
+    
+    <!-- SECCIÓN 1: UPLOAD -->
+    <div id="uploadSection" class="processor-section active">
+        <div class="processor-card">
+            <h2>📤 Subir Imagen</h2>
+            <p>Sube una imagen para comenzar el procesamiento</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="imageInput" accept="image/*" style="display:none;">
+                <div class="upload-placeholder">
+                    <span class="upload-icon">📁</span>
+                    <p>Haz clic o arrastra una imagen aquí</p>
+                    <small>Formatos: JPG, PNG, BMP</small>
+                </div>
+            </div>
+            
+            <div id="uploadStatus" class="status-message" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: IMAGEN ORIGINAL EN GRISES -->
+    <div id="greyImageSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📊 Imagen Original (Escala de Grises)</h2>
+            
+            <div class="image-display">
+                <img id="greyImage" src="" alt="Imagen en grises">
+            </div>
+            
+            <div class="image-info">
+                <p><strong>Dimensiones:</strong> <span id="imageDims">-</span></p>
+                <p><strong>Formato:</strong> Escala de Grises</p>
+            </div>
+            
+            <div class="voice-options">
+                <p class="voice-instruction">💡 Selecciona la misma opción dos veces para regresar</p>
+                <h3>🎤 Opciones disponibles:</h3>
+                <div class="option-item">
+                    <span class="option-number">UNO</span>
+                    <span class="option-text"><strong>UNO</strong> - Establecer % de compresión</span>
+                    <span class="status" id="status-opt1">◯</span>
+                </div>
+                <div class="option-item">
+                    <span class="option-number">DOS</span>
+                    <span class="option-text"><strong>DOS</strong> - Comprimir</span>
+                    <span class="status" id="status-opt2">◯</span>
+                </div>
+                <div id="optionRegresar" class="option-item" style="display:none;">
+                    <span class="option-number">↶</span>
+                    <span class="option-text"><strong>CONFIRMAR</strong> - Regresar</span>
+                    <span class="status" id="status-regresar">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: MODAL - SLIDER DE COMPRESIÓN -->
+    <div id="compressionModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎚️ Establecer Porcentaje de Compresión</h2>
+                <p>Desliza para elegir el nivel de compresión</p>
+            </div>
+            
+            <div class="modal-body">
+                <div class="slider-container">
+                    <input type="range" id="compressionSlider" min="0" max="100" value="50" class="slider">
+                    <div class="slider-labels">
+                        <span>0% (Máxima compresión)</span>
+                        <span id="sliderValue" class="slider-value">50%</span>
+                        <span>100% (Sin compresión)</span>
+                    </div>
+                </div>
+                
+                <div class="slider-preview">
+                    <div class="preview-item">
+                        <h4>Vista previa</h4>
+                        <p>Coeficientes a mantener: <span id="coefCount">-</span></p>
+                        <p>Coeficientes a eliminar: <span id="coefRemove">-</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <p class="modal-hint">📢 Di <strong>CONFIRMAR</strong> para salir de esta ventana</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: MAGNITUD DCT -->
+    <div id="dctMagnitudeSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>🔍 Magnitud DCT 2D</h2>
+            <p>Visualización de los coeficientes DCT (escala logarítmica)</p>
+            
+            <div class="dct-display">
+                <canvas id="dctCanvas" width="512" height="512"></canvas>
+                <p class="canvas-note">Los valores más brillantes representan coeficientes más grandes</p>
+            </div>
+            
+            <div class="dct-info">
+                <p><strong>Total de coeficientes:</strong> <span id="totalCoef">-</span></p>
+                <p><strong>Coeficientes a retener:</strong> <span id="retainCoef">-</span></p>
+                <p><strong>Nivel de compresión:</strong> <span id="compressionLevel">-</span>%</p>
+            </div>
+            
+            <div class="voice-options">
+                <p class="voice-instruction">💡 Selecciona la misma opción dos veces para regresar</p>
+                <h3>🎤 Opciones disponibles:</h3>
+                <div class="option-item">
+                    <span class="option-number">UNO</span>
+                    <span class="option-text"><strong>UNO</strong> - DCT Inversa (Gris)</span>
+                    <span class="status" id="status-opt3">◯</span>
+                </div>
+                <div class="option-item">
+                    <span class="option-number">DOS</span>
+                    <span class="option-text"><strong>DOS</strong> - DCT Inversa (Color)</span>
+                    <span class="status" id="status-opt4">◯</span>
+                </div>
+                <div id="optionRegresar2" class="option-item" style="display:none;">
+                    <span class="option-number">↶</span>
+                    <span class="option-text"><strong>CONFIRMAR</strong> - Regresar</span>
+                    <span class="status" id="status-regresar2">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 5: RESULTADO FINAL -->
+    <div id="resultSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>✅ Resultado Final</h2>
+            
+            <div class="comparison-container">
+                <div class="comparison-item">
+                    <h3>Original (Grises)</h3>
+                    <img id="resultOriginal" src="" style="max-width: 300px; max-height: 300px;">
+                    <p id="resultOriginalInfo"></p>
+                </div>
+                <div class="comparison-item">
+                    <h3>Comprimida</h3>
+                    <img id="resultCompressed" src="" style="max-width: 300px; max-height: 300px;">
+                    <p id="resultCompressedInfo"></p>
+                </div>
+            </div>
+            
+            <div class="download-section">
+                <button id="downloadBtn" class="btn-download">📥 Descargar Imagen Comprimida</button>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones disponibles:</h3>
+                <div class="option-item">
+                    <span class="option-number">1</span>
+                    <span class="option-text"><strong>UNO</strong> - Nueva imagen</span>
+                    <span class="status" id="status-opt5">◯</span>
+                </div>
+                <div class="option-item">
+                    <span class="option-number">2</span>
+                    <span class="option-text"><strong>DOS</strong> - Mostrar todos los pasos</span>
+                    <span class="status" id="status-opt6">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 6: VISUALIZACIÓN DE PASOS -->
+    <div id="stepsSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📸 Todos los pasos del procesamiento</h2>
+            
+            <div class="steps-container">
+                <div class="step-item">
+                    <h3>Paso 1: Imagen Original</h3>
+                    <img id="stepOriginal" src="" style="max-width: 250px; max-height: 250px;">
+                </div>
+                <div class="step-arrow">→</div>
+                <div class="step-item">
+                    <h3>Paso 2: Escala de Grises</h3>
+                    <img id="stepGrayscale" src="" style="max-width: 250px; max-height: 250px;">
+                </div>
+                <div class="step-arrow">→</div>
+                <div class="step-item">
+                    <h3>Paso 3: Magnitud DCT</h3>
+                    <canvas id="stepDCT" width="256" height="256" style="max-width: 250px; max-height: 250px; border: 1px solid #ddd;"></canvas>
+                </div>
+                <div class="step-arrow">→</div>
+                <div class="step-item">
+                    <h3>Paso 4: Reconstruida</h3>
+                    <img id="stepReconstructed" src="" style="max-width: 250px; max-height: 250px;">
+                </div>
+            </div>
+            
+            <div class="steps-info">
+                <p>Compresión: <strong id="stepsCompressionPercent">50%</strong></p>
+                <p>Coeficientes retenidos: <strong id="stepsRetained">-</strong></p>
+                <p>Coeficientes eliminados: <strong id="stepsRemoved">-</strong></p>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones disponibles:</h3>
+                <div class="option-item">
+                    <span class="option-number">1</span>
+                    <span class="option-text"><strong>UNO</strong> - Regresar</span>
+                    <span class="status" id="status-opt7">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- CONFIRMATION MODAL -->
+<div id="confirmationModalOverlay" class="confirmation-modal-overlay"></div>
+<div id="confirmationModal" class="confirmation-modal">
+    <div class="confirmation-header">
+        <h3>🤔 ¿Estás seguro?</h3>
+    </div>
+    <div class="confirmation-body">
+        <p id="confirmationMessage">Se ejecutará la acción seleccionada</p>
+    </div>
+    <div class="confirmation-footer">
+        <div class="button-group">
+            <div class="button-wrapper">
+                <span class="button-number">1</span>
+                <button class="btn-confirm" id="btnConfirmYes">Confirmar ✅</button>
+            </div>
+            <div class="button-wrapper">
+                <span class="button-number">2</span>
+                <button class="btn-cancel" id="btnConfirmNo">Cancelar ❌</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirmation-hint">
+        Di UNO para confirmar o DOS para cancelar
+    </div>
+</div>
+
+<style>
+:root {
+    --primary: #0066cc;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --gray: #666;
+}
+
+.image-processor-wrapper {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 2rem 1rem;
+}
+
+.processor-section {
+    animation: fadeIn 0.3s ease;
+    display: none;
+}
+
+.processor-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.processor-card {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+    border-top: 4px solid var(--primary);
+}
+
+.processor-card h2 {
+    color: var(--primary);
+    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+}
+
+.processor-card p {
+    color: var(--gray);
+    margin: 0 0 1.5rem 0;
+}
+
+/* UPLOAD AREA */
+.upload-area {
+    border: 3px dashed var(--primary);
+    border-radius: 8px;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.upload-area:hover {
+    background: rgba(0, 102, 204, 0.05);
+    border-color: #004499;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.upload-placeholder p {
+    margin: 0.5rem 0;
+    font-weight: 600;
+}
+
+.upload-placeholder small {
+    color: var(--gray);
+}
+
+/* IMAGE DISPLAY */
+.image-display {
+    margin: 1.5rem 0;
+    text-align: center;
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-display img {
+    max-width: 100%;
+    max-height: 450px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: block;
+}
+
+.image-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.image-info p {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+/* VOICE OPTIONS */
+.voice-options {
+    background: linear-gradient(135deg, #e8eef7 0%, #f0f5ff 100%);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+    margin-top: 1.5rem;
+}
+
+.voice-instruction {
+    color: #0066cc;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0 0 1rem 0;
+    padding: 10px 12px;
+    background: rgba(0, 102, 204, 0.08);
+    border-left: 3px solid #0066cc;
+    border-radius: 4px;
+}
+
+.voice-options h3 {
+    color: var(--primary);
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+}
+
+.option-item {
+    display: grid;
+    grid-template-columns: 1fr 60px;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 1.2rem;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 2px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.option-item:hover {
+    border-color: #0066cc;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    transform: translateX(4px);
+}
+
+.option-item.selected {
+    background: white;
+    border-color: #003d99;
+    border-width: 3px;
+    box-shadow: 0 4px 12px rgba(0, 61, 153, 0.3);
+    transform: translateX(4px);
+    animation: selectGlow 0.3s ease-out;
+}
+
+.option-item.selected .option-number,
+.option-item.selected .option-text {
+    color: #003d99;
+    font-weight: 600;
+}
+
+.option-item.selected .status {
+    color: #003d99;
+}
+
+@keyframes selectGlow {
+    0% {
+        border-width: 2px;
+        box-shadow: 0 2px 6px rgba(0, 102, 204, 0.3);
+    }
+    100% {
+        border-width: 3px;
+        box-shadow: 0 4px 12px rgba(0, 61, 153, 0.3);
+    }
+}
+
+.option-item:last-of-type {
+    margin-bottom: 0;
+}
+
+.option-number {
+    display: none;
+}
+
+.option-text {
+    color: #333;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.option-text strong {
+    color: var(--primary);
+}
+
+.status {
+    font-size: 2rem;
+    text-align: center;
+    min-width: 50px;
+    transition: all 0.3s ease;
+    color: #0066cc;
+}
+
+.status.selected {
+    transform: scale(1.1);
+    animation: statusPulse 0.3s ease-out;
+}
+
+.option-item.selected .status {
+    color: white;
+}
+
+@keyframes statusPulse {
+    0% {
+        transform: scale(1);
+    }
+    100% {
+        transform: scale(1.1);
+    }
+}
+
+.status.active {
+    color: var(--success);
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
+.voice-status {
+    margin-top: 1rem;
+    padding: 0.8rem;
+    background: white;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+/* MODAL */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #004499 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 4px solid #004499;
+}
+
+.modal-header h2 {
+    color: white;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+}
+
+.modal-header p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.slider-container {
+    margin-bottom: 2rem;
+}
+
+.slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #e0e0e0;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
+}
+
+.slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
+}
+
+.slider-labels {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    margin-top: 0.8rem;
+    font-size: 0.9rem;
+    color: var(--gray);
+}
+
+.slider-value {
+    color: var(--primary);
+    font-weight: 700;
+    text-align: center;
+}
+
+.slider-preview {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.preview-item p {
+    margin: 0.5rem 0;
+}
+
+.modal-footer {
+    padding: 1.5rem 2rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    border-radius: 0 0 12px 12px;
+    text-align: center;
+}
+
+.modal-hint {
+    margin: 0;
+    color: var(--gray);
+    font-size: 0.95rem;
+}
+
+.modal-hint strong {
+    color: var(--primary);
+}
+
+/* DCT DISPLAY */
+.dct-display {
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+#dctCanvas {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: #000;
+}
+
+.canvas-note {
+    margin-top: 0.8rem;
+    font-size: 0.9rem;
+    color: var(--gray);
+    font-style: italic;
+}
+
+.dct-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.dct-info p {
+    margin: 0.5rem 0;
+}
+
+/* COMPARISON */
+.comparison-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin: 1.5rem 0;
+}
+
+.comparison-item {
+    text-align: center;
+}
+
+.comparison-item h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.comparison-item img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 0.5rem;
+}
+
+.comparison-item p {
+    font-size: 0.9rem;
+    color: var(--gray);
+}
+
+/* STATISTICS - REMOVED */
+
+/* DOWNLOAD */
+.download-section {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.btn-download {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-download:hover {
+    background: #16a34a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+/* STEPS CONTAINER */
+.steps-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #f0f5ff 100%);
+    border-radius: 12px;
+    margin: 2rem 0;
+}
+
+.step-item {
+    text-align: center;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.step-item h3 {
+    margin: 0 0 1rem 0;
+    color: var(--primary);
+    font-size: 0.95rem;
+}
+
+.step-item img,
+.step-item canvas {
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    transition: transform 0.3s ease;
+}
+
+.step-item:hover img,
+.step-item:hover canvas {
+    transform: scale(1.05);
+}
+
+.step-arrow {
+    font-size: 2rem;
+    color: var(--primary);
+    font-weight: bold;
+}
+
+.steps-info {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+    margin: 1.5rem 0;
+}
+
+.steps-info p {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+.steps-info strong {
+    color: var(--primary);
+}
+
+/* STATUS MESSAGE */
+.status-message {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border-left: 4px solid transparent;
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left-color: var(--danger);
+}
+
+.status-message.success {
+    background: #f0fdf4;
+    color: #166534;
+    border-left-color: var(--success);
+}
+
+/* CONFIRMATION MODAL */
+.confirmation-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    min-width: 350px;
+    animation: popIn 0.2s ease-out;
+    display: none;
+    flex-direction: column;
+}
+
+.confirmation-modal.show {
+    display: flex;
+}
+
+@keyframes popIn {
+    from {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+.confirmation-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+}
+
+.confirmation-modal-overlay.show {
+    display: block;
+}
+
+.confirmation-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.confirmation-header h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.confirmation-body {
+    padding: 1.5rem;
+    text-align: center;
+    color: #333;
+}
+
+.confirmation-body p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.confirmation-footer {
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    border-top: 1px solid #e0e0e0;
+}
+
+.button-group {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.button-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.button-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #0066cc;
+    min-width: 30px;
+    text-align: center;
+}
+
+.btn-confirm {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+}
+
+.btn-confirm:hover {
+    background: #16a34a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-confirm:active {
+    transform: translateY(0);
+}
+
+.btn-confirm.highlight {
+    background: #16a34a;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 4px 12px rgba(34, 197, 94, 0.3);
+    transform: scale(1.05);
+}
+
+.btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+    border: 2px solid #e0e0e0;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+}
+
+.btn-cancel:hover {
+    background: #e0e0e0;
+    border-color: #999;
+    transform: translateY(-2px);
+}
+
+.btn-cancel:active {
+    transform: translateY(0);
+}
+
+.btn-cancel.highlight {
+    background: #999;
+    color: white;
+    border-color: #666;
+    box-shadow: 0 0 20px rgba(102, 102, 102, 0.6), 0 4px 12px rgba(102, 102, 102, 0.3);
+    transform: scale(1.05);
+}
+
+.confirmation-hint {
+    font-size: 0.8rem;
+    color: #999;
+    padding: 0.5rem 1.5rem 1rem 1.5rem;
+    text-align: center;
+    font-style: italic;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .processor-card {
+        padding: 1.5rem;
+    }
+    
+    .comparison-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .option-item {
+        grid-template-columns: auto 1fr;
+    }
+    
+    .status {
+        display: none;
+    }
+    
+    .modal-content {
+        width: 95%;
+    }
+}
+</style>
+
+<script>
+// ESTADO GLOBAL SIMPLE
+let currentState = 'upload';
+let selectedOption = null;
+let confirmationPending = false;
+let cancelPending = false;
+let doubleConfirmEnabled = true;
+let showingConfirmationModal = false;
+let confirmationModalSelection = null; // 'confirmar' o 'cancelar'
+let compressionPercent = 50;
+let n_subbands = 16;
+let distance_metric = 'euclidean';
+let originalImageBase64 = null;
+let greyImageBase64 = null;
+let compressedImageBase64 = null;
+let dctMagnitudeData = null;
+let processedStepsData = null;
+
+// ELEMENTOS
+const uploadArea = document.getElementById('uploadArea');
+const imageInput = document.getElementById('imageInput');
+
+// UPLOAD
+uploadArea.addEventListener('click', () => imageInput.click());
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = 'rgba(0, 102, 204, 0.1)';
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.style.background = '');
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = '';
+    if (e.dataTransfer.files.length) {
+        imageInput.files = e.dataTransfer.files;
+        handleImageUpload();
+    }
+});
+
+imageInput.addEventListener('change', handleImageUpload);
+
+async function handleImageUpload() {
+    const file = imageInput.files[0];
+    if (!file) return;
+    
+    console.log('Procesando archivo:', file.name);
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const img = new Image();
+        img.onload = async () => {
+            console.log('Imagen cargada');
+            
+            // Crear canvas y redimensionar a 256x256
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, 256, 256);
+            
+            // Obtener base64
+            originalImageBase64 = canvas.toDataURL('image/png');
+            
+            // Convertir a grises
+            await convertToGrey();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function convertToGrey() {
+    try {
+        console.log('🔄 Enviando imagen al servidor...');
+        
+        // Enviar imagen al backend
+        const response = await fetch('/api/image/grayscale', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({image_base64: originalImageBase64})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            greyImageBase64 = data.image;
+            
+            // Asegurarse de que tenga el prefijo data:image
+            if (!greyImageBase64.startsWith('data:')) {
+                greyImageBase64 = 'data:image/png;base64,' + greyImageBase64;
+            }
+            
+            const imgElem = document.getElementById('greyImage');
+            imgElem.src = greyImageBase64;
+            imgElem.onerror = () => {
+                console.error('❌ Error cargando imagen');
+                showError('Error al cargar imagen en gris');
+            };
+            imgElem.onload = () => {
+                console.log('✅ Imagen en gris cargada');
+            };
+            
+            document.getElementById('imageDims').textContent = '256 × 256';
+            
+            // Cambiar a sección de grises
+            switchSection('grey');
+            audioStatus.textContent = 'Di "UNO" o "DOS"';
+        } else {
+            showError('Error al convertir a grises: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error de conexión: ' + error.message);
+    }
+}
+
+function switchSection(section) {
+    // Ocultar todas
+    document.querySelectorAll('.processor-section').forEach(s => {
+        s.style.display = 'none';
+        s.classList.remove('active');
+    });
+    
+    // Mostrar la correcta
+    const sectionMap = {
+        'upload': 'uploadSection',
+        'grey': 'greyImageSection',
+        'dct': 'dctMagnitudeSection',
+        'result': 'resultSection'
+    };
+    
+    if (sectionMap[section]) {
+        const elem = document.getElementById(sectionMap[section]);
+        elem.style.display = 'block';
+        elem.classList.add('active');
+        console.log(`📄 Sección cambiada a: ${section}`);
+    }
+    
+    currentState = section;
+    selectedOption = null;
+    confirmationPending = false;
+}
+
+async function handleCompressionChange(value) {
+    compressionPercent = parseInt(value);
+    document.getElementById('sliderValue').textContent = compressionPercent + '%';
+    
+    const totalCoef = 256 * 256;
+    const retained = Math.ceil((totalCoef * compressionPercent) / 100);
+    const removed = totalCoef - retained;
+    
+    document.getElementById('coefCount').textContent = retained.toLocaleString();
+    document.getElementById('coefRemove').textContent = removed.toLocaleString();
+}
+
+async function compressImage() {
+    document.getElementById('compressionModal').style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/image/compress', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                image_base64: greyImageBase64,
+                compression_percent: compressionPercent
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            compressedImageBase64 = data.compressed_image;
+            
+            // Mostrar magnitud DCT
+            showDCTMagnitude(data.dct_magnitude);
+            switchSection('dct');
+        } else {
+            showError('Error en compresión: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error de conexión');
+    }
+}
+
+function showDCTMagnitude(magnitude) {
+    // Guardar magnitud para luego mostrar en pasos
+    dctMagnitudeData = magnitude;
+    
+    const canvas = document.getElementById('dctCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Detectar tamaño de la magnitud
+    const height = magnitude.length;
+    const width = magnitude[0]?.length || height;
+    
+    // Usar tamaño del canvas (512x512)
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    
+    // Crear imagen con tamaño del canvas
+    const imageData = ctx.createImageData(canvasWidth, canvasHeight);
+    const data = imageData.data;
+    
+    // Normalizar magnitud
+    const flat = magnitude.flat();
+    const max = Math.max(...flat);
+    
+    // Escala para mapear magnitud al canvas
+    const scaleX = width / canvasWidth;
+    const scaleY = height / canvasHeight;
+    
+    // Llenar canvas escalando la magnitud
+    for (let cy = 0; cy < canvasHeight; cy++) {
+        for (let cx = 0; cx < canvasWidth; cx++) {
+            // Mapear coordenadas del canvas a la magnitud
+            const mx = Math.min(Math.floor(cx * scaleX), width - 1);
+            const my = Math.min(Math.floor(cy * scaleY), height - 1);
+            
+            const val = Math.log1p(magnitude[my][mx]) / Math.log1p(max);
+            const gray = Math.floor(val * 255);
+            
+            const idx = (cy * canvasWidth + cx) * 4;
+            data[idx] = gray;       // R
+            data[idx + 1] = gray;   // G
+            data[idx + 2] = gray;   // B
+            data[idx + 3] = 255;    // A
+        }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+    
+    // Actualizar info
+    const totalCoef = width * height;
+    document.getElementById('totalCoef').textContent = totalCoef.toLocaleString();
+    document.getElementById('retainCoef').textContent = Math.ceil((totalCoef * compressionPercent) / 100).toLocaleString();
+    document.getElementById('compressionLevel').textContent = compressionPercent;
+}
+
+async function reconstructAndShowResult(mode) {
+    try {
+        const response = await fetch('/api/image/reconstruct', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                image_base64: greyImageBase64,
+                compression_percent: compressionPercent,
+                mode: mode
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Guardar imagen comprimida
+            compressedImageBase64 = data.compressed_image;
+            
+            // Mostrar resultados
+            document.getElementById('resultOriginal').src = greyImageBase64;
+            document.getElementById('resultCompressed').src = compressedImageBase64;
+            
+            switchSection('result');
+        } else {
+            showError('Error: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error de conexión');
+    }
+}
+
+function downloadImage() {
+    const link = document.createElement('a');
+    link.href = compressedImageBase64;
+    link.download = 'imagen_comprimida.png';
+    link.click();
+}
+
+function showAllSteps() {
+    // Mostrar imagen original
+    document.getElementById('stepOriginal').src = originalImageBase64;
+    
+    // Mostrar imagen en grises
+    document.getElementById('stepGrayscale').src = greyImageBase64;
+    
+    // Mostrar magnitud DCT
+    if (dctMagnitudeData) {
+        const canvas = document.getElementById('stepDCT');
+        const ctx = canvas.getContext('2d');
+        
+        const imageData = ctx.createImageData(256, 256);
+        const data = imageData.data;
+        
+        const flat = dctMagnitudeData.flat();
+        const max = Math.max(...flat);
+        
+        let idx = 0;
+        for (let i = 0; i < dctMagnitudeData.length; i++) {
+            for (let j = 0; j < dctMagnitudeData[i].length; j++) {
+                const val = Math.log1p(dctMagnitudeData[i][j]) / Math.log1p(max);
+                const gray = Math.floor(val * 255);
+                
+                data[idx * 4] = gray;
+                data[idx * 4 + 1] = gray;
+                data[idx * 4 + 2] = gray;
+                data[idx * 4 + 3] = 255;
+                idx++;
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+    }
+    
+    // Mostrar imagen reconstruida
+    document.getElementById('stepReconstructed').src = compressedImageBase64;
+    
+    // Actualizar información
+    const totalCoef = 256 * 256;
+    const retained = Math.ceil((totalCoef * compressionPercent) / 100);
+    const removed = totalCoef - retained;
+    
+    document.getElementById('stepsCompressionPercent').textContent = compressionPercent + '%';
+    document.getElementById('stepsRetained').textContent = retained.toLocaleString();
+    document.getElementById('stepsRemoved').textContent = removed.toLocaleString();
+    
+    // Cambiar a sección de pasos
+    switchSection('steps');
+}
+
+function showError(message) {
+    const elem = document.getElementById('uploadStatus');
+    elem.textContent = message;
+    elem.className = 'status-message error';
+    elem.style.display = 'block';
+}
+
+function reset() {
+    imageInput.value = '';
+    currentState = 'upload';
+    selectedOption = null;
+    confirmationPending = false;
+    compressionPercent = 50;
+    originalImageBase64 = null;
+    greyImageBase64 = null;
+    compressedImageBase64 = null;
+    document.getElementById('compressionModal').style.display = 'none';
+    switchSection('upload');
+}
+
+// SETUP SLIDER
+document.getElementById('compressionSlider').addEventListener('input', (e) => {
+    handleCompressionChange(e.target.value);
+});
+
+// SETUP BOTÓN DESCARGAR
+document.getElementById('downloadBtn').addEventListener('click', downloadImage);
+
+window.onload = () => {
+    const cb = document.getElementById('doubleConfirmToggle');
+    console.log("Checkbox encontrado:", cb);
+
+    cb.addEventListener('change', (e) => {
+        console.log("CHANGE EVENT DISPARADO");
+        console.log(e.target.checked);
+        doubleConfirmEnabled = e.target.checked;
+    console.log(`🔐 Doble confirmación: ${doubleConfirmEnabled ? 'ACTIVADA' : 'DESACTIVADA'}`);
+
+    });
+};
+
+// SETUP BOTONES CONFIRMATION MODAL
+document.getElementById('btnConfirmYes').addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🖱️ Click en btnConfirmYes');
+    confirmAction();
+});
+
+document.getElementById('btnConfirmNo').addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🖱️ Click en btnConfirmNo');
+    hideConfirmationModal();
+});
+
+document.getElementById('confirmationModalOverlay').addEventListener('click', hideConfirmationModal);
+
+// BOTONES DE ACCIÓN MANUAL
+document.addEventListener('keydown', (e) => {
+    if (e.key === '1') {
+        // UNO - confirma modal si está abierto
+        if (showingConfirmationModal) {
+            document.getElementById('btnConfirmNo').classList.remove('highlight');
+            const btnYes = document.getElementById('btnConfirmYes');
+            btnYes.classList.add('highlight');
+            setTimeout(() => {
+                btnYes.click();
+            }, 300);
+            return;
+        }
+        // UNO normal
+        if (currentState === 'grey') {
+            if (selectedOption === 'uno') {
+                // Toggle off
+                selectedOption = null;
+                document.getElementById('optionRegresar').style.display = 'flex';
+            } else {
+                selectedOption = 'uno';
+                document.getElementById('optionRegresar').style.display = 'none';
+            }
+        } else if (currentState === 'dct') {
+            if (selectedOption === 'uno') {
+                selectedOption = null;
+                document.getElementById('optionRegresar2').style.display = 'flex';
+            } else {
+                selectedOption = 'uno';
+                document.getElementById('optionRegresar2').style.display = 'none';
+            }
+        } else if (currentState === 'result') {
+            selectedOption = 'uno';
+        } else if (currentState === 'steps') {
+            selectedOption = 'uno';
+        }
+        updateStatusIndicators();
+    } else if (e.key === '2') {
+        // DOS - cancela modal si está abierto
+        if (showingConfirmationModal) {
+            document.getElementById('btnConfirmYes').classList.remove('highlight');
+            const btnNo = document.getElementById('btnConfirmNo');
+            btnNo.classList.add('highlight');
+            setTimeout(() => {
+                btnNo.click();
+            }, 300);
+            return;
+        }
+        // DOS normal
+        if (currentState === 'grey') {
+            if (selectedOption === 'dos') {
+                selectedOption = null;
+                document.getElementById('optionRegresar').style.display = 'flex';
+            } else {
+                selectedOption = 'dos';
+                document.getElementById('optionRegresar').style.display = 'none';
+            }
+        } else if (currentState === 'dct') {
+            if (selectedOption === 'dos') {
+                selectedOption = null;
+                document.getElementById('optionRegresar2').style.display = 'flex';
+            } else {
+                selectedOption = 'dos';
+                document.getElementById('optionRegresar2').style.display = 'none';
+            }
+        } else if (currentState === 'result') {
+            selectedOption = 'dos';
+        }
+        updateStatusIndicators();
+    } else if (e.key === 'Enter') {
+        // CONFIRMAR - solo si el modal NO está abierto
+        if (showingConfirmationModal) {
+            return; // No hacer nada en el modal
+        }
+        // IMPORTANTE: Si doble confirmación está DESACTIVADA, ejecutar directamente
+        if (selectedOption && !doubleConfirmEnabled) {
+            console.log('⚡ Enter presionado - doubleConfirmEnabled es FALSE - ejecutando directamente');
+            executeAction();
+            return;
+        }
+        // Llamar a handleVoiceCommand para respetar doubleConfirmEnabled
+        handleVoiceCommand('confirmar');
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // CANCELAR con BORRAR - solo si el modal NO está abierto
+        if (showingConfirmationModal) {
+            return; // No hacer nada en el modal
+        }
+        // Cancelar requiere confirmación si doble confirmación está activada
+        if (doubleConfirmEnabled && selectedOption) {
+            if (selectedOption === 'regresar') {
+                showRegresarConfirmationModal();
+            } else {
+                // Mostrar modal preguntando si deseas cancelar
+                const modal = document.getElementById('confirmationModal');
+                const overlay = document.getElementById('confirmationModalOverlay');
+                const message = document.getElementById('confirmationMessage');
+                
+                showingConfirmationModal = true;
+                confirmationPending = true;
+                cancelPending = true; // Flag para indicar que se está cancelando
+                message.textContent = '¿Deseas cancelar la acción actual?';
+                
+                document.getElementById('btnConfirmYes').classList.remove('highlight');
+                document.getElementById('btnConfirmNo').classList.remove('highlight');
+                modal.classList.add('show');
+                overlay.classList.add('show');
+            }
+        } else {
+            // Sin doble confirmación, cancelar inmediatamente
+            selectedOption = null;
+            updateStatusIndicators();
+        }
+    }
+});
+
+function executeAction() {
+    if (currentState === 'grey') {
+        if (selectedOption === 'uno') {
+            document.getElementById('compressionModal').style.display = 'flex';
+        } else if (selectedOption === 'dos') {
+            compressImage();
+        }
+    } else if (currentState === 'dct') {
+        if (selectedOption === 'uno') {
+            reconstructAndShowResult('grey');
+        } else if (selectedOption === 'dos') {
+            reconstructAndShowResult('color');
+        }
+    } else if (currentState === 'result') {
+        if (selectedOption === 'uno') {
+            reset();
+        } else if (selectedOption === 'dos') {
+            showAllSteps();
+        }
+    } else if (currentState === 'steps') {
+        if (selectedOption === 'uno') {
+            reset();
+        }
+    }
+    
+    selectedOption = null;
+    confirmationPending = false;
+}
+
+function showConfirmationModal() {
+    showingConfirmationModal = true;
+    confirmationModalSelection = null; // Resetear selección
+    const modal = document.getElementById('confirmationModal');
+    const overlay = document.getElementById('confirmationModalOverlay');
+    const message = document.getElementById('confirmationMessage');
+    
+    // Limpiar highlights al abrir
+    document.getElementById('btnConfirmYes').classList.remove('highlight');
+    document.getElementById('btnConfirmNo').classList.remove('highlight');
+    
+    // Actualizar mensaje según la acción
+    let actionText = 'Se ejecutará la acción seleccionada';
+    if (currentState === 'grey' && selectedOption === 'uno') {
+        actionText = 'Se abrirá el selector de compresión';
+    } else if (currentState === 'grey' && selectedOption === 'dos') {
+        actionText = 'Se comprimirá la imagen';
+    } else if (currentState === 'dct' && selectedOption === 'uno') {
+        actionText = 'Se reconstruirá la imagen (escala de grises)';
+    } else if (currentState === 'dct' && selectedOption === 'dos') {
+        actionText = 'Se reconstruirá la imagen (color)';
+    } else if (currentState === 'result' && selectedOption === 'uno') {
+        actionText = 'Se cargará una nueva imagen';
+    } else if (currentState === 'result' && selectedOption === 'dos') {
+        actionText = 'Se mostrarán todos los pasos del procesamiento';
+    } else if (currentState === 'steps' && selectedOption === 'uno') {
+        actionText = 'Se cargará una nueva imagen';
+    }
+    
+    message.textContent = actionText;
+    modal.classList.add('show');
+    overlay.classList.add('show');
+}
+
+function hideConfirmationModal() {
+    showingConfirmationModal = false;
+    confirmationModalSelection = null; // Resetear selección al cerrar
+    const modal = document.getElementById('confirmationModal');
+    const overlay = document.getElementById('confirmationModalOverlay');
+    // Limpiar highlights al cerrar
+    document.getElementById('btnConfirmYes').classList.remove('highlight');
+    document.getElementById('btnConfirmNo').classList.remove('highlight');
+    modal.classList.remove('show');
+    overlay.classList.remove('show');
+}
+
+function showRegresarConfirmationModal() {
+    showingConfirmationModal = true;
+    const modal = document.getElementById('confirmationModal');
+    const overlay = document.getElementById('confirmationModalOverlay');
+    const message = document.getElementById('confirmationMessage');
+    
+    message.textContent = '¿Deseas regresar a la sección anterior?';
+    
+    // Limpiar listeners previos del modal
+    const btnYes = document.getElementById('btnConfirmYes');
+    const btnNo = document.getElementById('btnConfirmNo');
+    
+    // Reemplazar botones con nuevos listeners para regresar
+    const newBtnYes = btnYes.cloneNode(true);
+    const newBtnNo = btnNo.cloneNode(true);
+    btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+    btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+    
+    newBtnYes.addEventListener('click', () => {
+        handleRegresar();
+        selectedOption = null;
+        hideConfirmationModal();
+        console.log('🔙 Regresando...');
+    });
+    
+    newBtnNo.addEventListener('click', () => {
+        hideConfirmationModal();
+    });
+    
+    modal.classList.add('show');
+    overlay.classList.add('show');
+}
+
+function confirmAction() {
+    console.log('🟢 confirmAction llamada');
+    console.log('📊 Estado:', { currentState, selectedOption, showingConfirmationModal });
+    
+    if (showingConfirmationModal) {
+        if (cancelPending) {
+            // Se confirmo la cancelación
+            console.log('❌ Cancelando acción - modal de cancelación confirmado');
+            selectedOption = null;
+            cancelPending = false;
+            updateStatusIndicators();
+        } else {
+            // Se confirmo una acción normal
+            console.log('✅ Cerrando modal de confirmación y ejecutando acción');
+            executeAction();
+        }
+        // Limpiar highlights antes de cerrar
+        document.getElementById('btnConfirmYes').classList.remove('highlight');
+        document.getElementById('btnConfirmNo').classList.remove('highlight');
+        hideConfirmationModal();
+    }
+}
+
+function updateStatusIndicators() {
+    // Remover clases selected de todos los option-items y status
+    document.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
+    document.querySelectorAll('.status').forEach(s => s.classList.remove('selected'));
+    
+    if (currentState === 'grey') {
+        if (selectedOption === 'uno') {
+            const optionItem = document.querySelector('[id="status-opt1"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt1').classList.add('selected');
+            // Forzar re-flujo para reiniciar animación
+            void optionItem?.offsetWidth;
+        } else if (selectedOption === 'dos') {
+            const optionItem = document.querySelector('[id="status-opt2"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt2').classList.add('selected');
+            void optionItem?.offsetWidth;
+        } else if (selectedOption === 'regresar') {
+            const optionItem = document.querySelector('[id="status-regresar"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-regresar').classList.add('selected');
+            void optionItem?.offsetWidth;
+        }
+    } else if (currentState === 'dct') {
+        if (selectedOption === 'uno') {
+            const optionItem = document.querySelector('[id="status-opt3"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt3').classList.add('selected');
+            void optionItem?.offsetWidth;
+        } else if (selectedOption === 'dos') {
+            const optionItem = document.querySelector('[id="status-opt4"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt4').classList.add('selected');
+            void optionItem?.offsetWidth;
+        } else if (selectedOption === 'regresar') {
+            const optionItem = document.querySelector('[id="status-regresar2"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-regresar2').classList.add('selected');
+            void optionItem?.offsetWidth;
+        }
+    } else if (currentState === 'result') {
+        if (selectedOption === 'uno') {
+            const optionItem = document.querySelector('[id="status-opt5"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt5').classList.add('selected');
+            void optionItem?.offsetWidth;
+        } else if (selectedOption === 'dos') {
+            const optionItem = document.querySelector('[id="status-opt6"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt6').classList.add('selected');
+            void optionItem?.offsetWidth;
+        }
+    } else if (currentState === 'steps') {
+        if (selectedOption === 'uno') {
+            const optionItem = document.querySelector('[id="status-opt7"]').closest('.option-item');
+            optionItem?.classList.add('selected');
+            document.getElementById('status-opt7').classList.add('selected');
+            void optionItem?.offsetWidth;
+        }
+    }
+}
+
+console.log('Script de procesamiento interactivo listo');
+console.log('Usa: 1/2 para seleccionar, Enter para confirmar');
+</script>
+
+<!-- AUDIO MODAL -->
+<div id="audioModal" class="audio-modal hidden">
+    <div class="audio-modal-header">
+        <h3>🎤 Micrófono</h3>
+        <button class="dropdown-toggle" id="optionsDropdown" title="Opciones">⋮</button>
+    </div>
+    <div class="dropdown-menu" id="dropdownMenu" style="display:none;">
+        <label class="dropdown-item">
+            <input type="checkbox" id="doubleConfirmToggle" checked>
+            <span>🔐 Doble confirmación</span>
+        </label>
+    </div>
+    <button class="recording-button" id="recordButton">🎙️</button>
+    <div class="recording-timer" id="recordingTimer" style="display:none;">Grabando: <span id="timerCount">0</span>s</div>
+    <div class="audio-status" id="audioStatus">✅ Presiona para grabar</div>
+</div>
+
+<script>
+// ============ AUDIO RECORDING - USANDO SCRIPTPROCESSORNODE ============
+let audioContext = null;
+let scriptNode = null;
+let audioChunks = [];
+let isRecording = false;
+let recordingStartTime = null;
+let timerInterval = null;
+
+// Elementos del modal
+const recordButton = document.getElementById('recordButton');
+const audioModal = document.getElementById('audioModal');
+const recordingTimer = document.getElementById('recordingTimer');
+const timerCount = document.getElementById('timerCount');
+const audioStatus = document.getElementById('audioStatus');
+const optionsDropdown = document.getElementById('optionsDropdown');
+const dropdownMenu = document.getElementById('dropdownMenu');
+
+console.log('🔍 Audio script cargado');
+
+// Toggle dropdown
+optionsDropdown.addEventListener('click', () => {
+    const isVisible = dropdownMenu.style.display !== 'none';
+    dropdownMenu.style.display = isVisible ? 'none' : 'flex';
+    optionsDropdown.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+});
+
+// Cerrar dropdown al hacer click fuera
+document.addEventListener('click', (e) => {
+    if (!audioModal.contains(e.target)) {
+        dropdownMenu.style.display = 'none';
+        optionsDropdown.style.transform = 'rotate(0deg)';
+    }
+});
+
+// Codificador WAV (igual que en index.html)
+class WavEncoder {
+    static encode(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+
+        function writeString(offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+
+        let offset = 44;
+        for (let i = 0; i < samples.length; i++) {
+            let s = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            offset += 2;
+        }
+
+        return buffer;
+    }
+}
+
+// Mostrar modal al cargar
+window.addEventListener('load', () => {
+    console.log('📄 Página cargada - inicializando audio');
+    audioModal.classList.remove('hidden');
+    initAudio();
+});
+
+async function initAudio() {
+    try {
+        console.log('🔄 Solicitando acceso a micrófono...');
+        
+        const options = await getAudioOptions();
+        const stream = await navigator.mediaDevices.getUserMedia(options);
+        console.log('✅ Micrófono accesible');
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        // Usar ScriptProcessorNode para capturar audio raw
+        scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(scriptNode);
+        scriptNode.connect(audioContext.destination);
+        
+        audioStatus.textContent = '✅ Presiona para grabar';
+        recordButton.disabled = false;
+        console.log('✅ Audio context inicializado');
+    } catch (error) {
+        console.error('❌ Error de micrófono:', error);
+        audioStatus.textContent = `❌ Micrófono: ${error.name}`;
+        recordButton.disabled = true;
+    }
+}
+
+recordButton.addEventListener('click', () => {
+    if (!isRecording) {
+        startRecording();
+    } else {
+        stopRecording();
+    }
+});
+
+function startRecording() {
+    if (!audioContext) {
+        audioStatus.textContent = '⏳ Inicializando...';
+        initAudio().then(() => startRecording());
+        return;
+    }
+    
+    console.log('▶️ Iniciando grabación...');
+    audioChunks = [];
+    isRecording = true;
+    recordButton.textContent = '⏹️';
+    recordingTimer.style.display = 'block';
+    audioStatus.textContent = 'Grabando...';
+    
+    recordingStartTime = Date.now();
+    timerInterval = setInterval(updateTimer, 100);
+    
+    scriptNode.onaudioprocess = (event) => {
+        if (isRecording) {
+            const inputData = event.inputBuffer.getChannelData(0);
+            audioChunks.push(new Float32Array(inputData));
+        }
+    };
+}
+
+function updateTimer() {
+    const elapsed = (Date.now() - recordingStartTime) / 1000;
+    timerCount.textContent = elapsed.toFixed(1);
+    
+    if (elapsed >= 1.0) {
+        clearInterval(timerInterval);
+        stopRecording();
+    }
+}
+
+function stopRecording() {
+    console.log('⏹️ Deteniendo grabación...');
+    if (!isRecording) return;
+    
+    isRecording = false;
+    clearInterval(timerInterval);
+    recordButton.textContent = '🎙️';
+    recordingTimer.style.display = 'none';
+    audioStatus.textContent = '⏳ Procesando...';
+    
+    scriptNode.onaudioprocess = null;
+    
+    processRecording();
+}
+
+async function processRecording() {
+    try {
+        if (audioChunks.length === 0) {
+            audioStatus.textContent = '❌ Sin audio capturado';
+            return;
+        }
+
+        // Concatenar chunks
+        const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const audioData = new Float32Array(totalLength);
+        let offset = 0;
+        for (let chunk of audioChunks) {
+            audioData.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        console.log(`📦 Audio procesado: ${audioData.length} samples, sr=${audioContext.sampleRate}`);
+
+        // Codificar a WAV
+        const sampleRate = audioContext.sampleRate;
+        const wavBuffer = WavEncoder.encode(audioData, sampleRate);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        
+        console.log(`📤 WAV creado: ${blob.size} bytes`);
+
+        // Enviar al servidor
+        const formData = new FormData();
+        formData.append('audio', blob, 'recording.wav');
+
+        console.log('📤 Enviando al servidor...');
+        const response = await fetch('/api/recognize', {
+            method: 'POST',
+            body: formData
+        });
+
+        console.log('📥 Respuesta:', response.status);
+        const result = await response.json();
+        
+        console.log('📥 JSON:', result);
+
+        if (result.success && result.recognized_command) {
+            const command = result.recognized_command.toLowerCase();
+            console.log('✅ Reconocido:', command);
+            audioStatus.textContent = `✅ "${command}"`;
+            
+            setTimeout(() => {
+                handleVoiceCommand(command);
+                audioStatus.textContent = '✅ Presiona para grabar';
+            }, 600);
+        } else {
+            const errorMsg = result.error || 'No reconocido';
+            console.warn('⚠️ Error:', errorMsg);
+            audioStatus.textContent = `❌ ${errorMsg.substring(0, 25)}...`;
+            setTimeout(() => {
+                audioStatus.textContent = '✅ Presiona para grabar';
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('❌ Error procesando:', error);
+        audioStatus.textContent = `❌ ${error.message.substring(0, 20)}`;
+        setTimeout(() => {
+            audioStatus.textContent = '✅ Presiona para grabar';
+        }, 2000);
+    }
+}
+
+// ============ VOICE COMMANDS ============
+function handleVoiceCommand(command) {
+    // Si estamos en el modal de compresión, solo escuchar CONFIRMAR
+    const compressionModal = document.getElementById('compressionModal');
+    if (compressionModal && compressionModal.style.display === 'flex') {
+        if (command === 'confirmar') {
+            // Cerrar modal de compresión y comprimir
+            compressionModal.style.display = 'none';
+            compressImage();
+        }
+        return; // Ignorar otros comandos en el modal de compresión
+    }
+    
+    // Si estamos en el modal de confirmación, UNO selecciona confirmar, DOS cancela directamente
+    if (showingConfirmationModal) {
+        if (command === 'uno' || command === '1') {
+            // Seleccionar botón de confirmar
+            confirmationModalSelection = 'confirmar';
+            document.getElementById('btnConfirmNo').classList.remove('highlight');
+            document.getElementById('btnConfirmYes').classList.add('highlight');
+            console.log('✅ Seleccionado: CONFIRMAR - di CONFIRMAR para ejecutar');
+            return;
+        } else if (command === 'dos' || command === '2') {
+            // Cancelar directamente sin pedir confirmación adicional
+            console.log('❌ DOS presionado - cancelando modal');
+            hideConfirmationModal();
+            return;
+        } else if (command === 'confirmar') {
+            // Confirmar la selección (solo si seleccionaste UNO)
+            console.log('🔔 CONFIRMAR presionado, selection:', confirmationModalSelection);
+            if (confirmationModalSelection === 'confirmar') {
+                console.log('✅ Ejecutando confirmAction');
+                confirmAction();
+            } else {
+                console.warn('⚠️ No hay selección o seleccionaste cancelar');
+            }
+            return;
+        } else if (command === 'cancelar') {
+            // Cancelar directo
+            console.log('❌ CANCELAR presionado - cerrando modal');
+            hideConfirmationModal();
+            return;
+        }
+        return; // No procesar más comandos si el modal está abierto
+    }
+    
+    if (command === 'uno' || command === '1') {
+        handleCommand('uno');
+    } else if (command === 'dos' || command === '2') {
+        handleCommand('dos');
+    } else if (command === 'confirmar') {
+        if (selectedOption) {
+            console.log(`🔍 CONFIRMAR - doubleConfirmEnabled: ${doubleConfirmEnabled}, selectedOption: ${selectedOption}`);
+            // Si doble confirmación está DESACTIVADA, ejecutar directamente SIN modal
+            if (!doubleConfirmEnabled) {
+                // NUNCA mostrar modal si está desactivada
+                console.log('⚡ Doble confirmación DESACTIVADA - ejecutando directamente, SIN MODAL');
+                executeAction();
+                return;
+            }
+            // Si doble confirmación está ACTIVADA, mostrar modal
+            if (selectedOption === 'regresar') {
+                // Modal especial para regresar
+                showRegresarConfirmationModal();
+            } else {
+                // Modal normal para otras acciones
+                showConfirmationModal();
+            }
+        }
+    }
+}
+
+function handleCommand(option) {
+    if (currentState === 'grey' || currentState === 'dct' || currentState === 'result' || currentState === 'steps') {
+        if (selectedOption === option) {
+            // Repetir comando: mostrar opción de regresar
+            if (currentState === 'grey') {
+                // En grey: mostrar optionRegresar
+                document.getElementById('optionRegresar').style.display = 'flex';
+                selectedOption = 'regresar';
+                console.log('↶ Opción Regresar disponible - di CONFIRMAR para regresar');
+            } else if (currentState === 'dct') {
+                // En dct: mostrar optionRegresar2
+                document.getElementById('optionRegresar2').style.display = 'flex';
+                selectedOption = 'regresar';
+                console.log('↶ Opción Regresar disponible - di CONFIRMAR para regresar');
+            }
+        } else {
+            // Seleccionar nueva opción
+            selectedOption = option;
+            // Ocultar regresar si estaba visible
+            if (currentState === 'grey') {
+                document.getElementById('optionRegresar').style.display = 'none';
+            } else if (currentState === 'dct') {
+                document.getElementById('optionRegresar2').style.display = 'none';
+            }
+            console.log(`✅ ${option.toUpperCase()} activado`);
+        }
+        updateStatusIndicators();
+    }
+}
+
+function handleRegresar() {
+    if (currentState === 'grey') {
+        // Regresar de grey a upload
+        switchSection('upload');
+        selectedOption = null;
+        console.log('↶ Regresando a Upload');
+    } else if (currentState === 'dct') {
+        // Regresar de dct a grey
+        switchSection('grey');
+        selectedOption = null;
+        console.log('↶ Regresando a Grises');
+    }
+}
+</script>
+
+{% endblock %}

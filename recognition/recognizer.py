@@ -21,6 +21,7 @@ from processing.audio_utils import read_wav, pad_or_trim, normalize_audio, recor
 from processing.fft_utils import analyze_signal
 from config import MODELOS_DIR
 from .model import Model
+from .distance_metrics import calculate_distance, AVAILABLE_METRICS
 
 def load_models():
     """
@@ -51,15 +52,15 @@ def load_models():
         raise FileNotFoundError("No se encontraron modelos en data/modelos/. Entrena primero con trainer.py")
     return models
 
-def compare_with_models(energies, models):
+def compare_with_models(energies, models, distance_method='euclidean'):
     """
     Compara un vector de energías contra todos los modelos entrenados.
     
-    Algoritmo (según documento):
+    Algoritmo:
     1. Para cada modelo guardado:
-        a) Obtener vector de umbrales: [E_c1, E_c2, ..., E_cN]
-        b) Calcular distancia euclidiana:
-           d = sqrt(sum_i(E_input_i - E_modelo_i)^2)
+        a) Obtener vector de energías: [E_c1, E_c2, ..., E_cN]
+        b) Obtener vector de desviaciones: [σ_c1, σ_c2, ..., σ_cN]
+        c) Calcular distancia usando el método seleccionado
     2. Seleccionar el modelo con menor distancia
     3. Ese comando es el reconocido
     
@@ -68,7 +69,15 @@ def compare_with_models(energies, models):
     energies : array
         Vector de energías de la entrada: [E_input1, E_input2, ..., E_inputN]
     models : dict
-        Modelos cargados con sus vectores de umbrales
+        Modelos cargados con sus vectores de umbrales y desviaciones
+    distance_method : str
+        Método de distancia a usar:
+        - 'euclidean': Distancia euclidiana clásica
+        - 'weighted_euclidean': Ponderada por estabilidad (1/std)
+        - 'mahalanobis_diagonal': Mahalanobis con matriz diagonal
+        - 'nll_gaussian': Verosimilitud gaussiana negativa
+        - 'downweight_unstable': Reduce peso en bandas inestables
+        - 'outlier_detection': Penaliza valores extremos
     
     Retorna:
     --------
@@ -87,13 +96,22 @@ def compare_with_models(energies, models):
 
     # Comparar con cada modelo
     for cmd, model in models.items():
-        # Vector de umbrales del modelo: [E_c1, E_c2, ..., E_cN]
+        # Obtener vectores del modelo
         model_energies = model.mean_energy
+        model_std_energies = model.std_energy
         
-        # Calcular distancia euclidiana (fórmula del documento)
-        # d = sqrt(sum_i(E_input_i - E_modelo_i)^2)
-        differences = energies - model_energies
-        distance = np.sqrt(np.sum(differences ** 2))
+        # Calcular distancia usando el método seleccionado
+        try:
+            distance = calculate_distance(
+                energies, 
+                model_energies, 
+                model_std_energies,
+                distance_method=distance_method
+            )
+        except ValueError as e:
+            print(f"⚠️  Error en método de distancia: {e}")
+            # Fallback a euclidiana
+            distance = calculate_distance(energies, model_energies, model_std_energies)
         
         diffs[cmd] = float(distance)
         print(f"   {cmd.upper()}: distancia = {distance:.6f}")
@@ -105,7 +123,7 @@ def compare_with_models(energies, models):
     best_cmd = min(diffs, key=diffs.get)
     best_diff = diffs[best_cmd]
 
-    print(f"\n✅ Comando reconocido: {best_cmd.upper()} (distancia={best_diff:.6f})")
+    print(f"\n✅ Comando reconocido: {best_cmd.upper()} (distancia={best_diff:.6f}) [método: {distance_method}]")
     return best_cmd, diffs
 
 def recognize_from_file(filename):

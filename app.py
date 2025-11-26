@@ -158,8 +158,9 @@ def recognize():
         # Analizar señal
         freqs, spectrum, energies = analyze_signal(audio_data)
 
-        # Comparar con modelos
-        best_cmd, diffs = compare_with_models(energies, models)
+        # Comparar con modelos (usando métrica de config.py)
+        from config import DISTANCE_METRIC
+        best_cmd, diffs = compare_with_models(energies, models, distance_method=DISTANCE_METRIC)
 
         # DEBUG: Verificar energías normalizadas
         print(f"DEBUG: Sum of energies: {np.sum(energies)}")
@@ -294,29 +295,75 @@ def training():
         return render_template('error.html', error=str(e)), 500
 
 
+@app.route('/settings')
+def settings():
+    """Página de configuración del sistema"""
+    try:
+        from config import N_SUBBANDS, DISTANCE_METRIC
+        return render_template('settings.html', n_subbands=N_SUBBANDS, distance_metric=DISTANCE_METRIC)
+    except Exception as e:
+        return render_template('error.html', error=str(e)), 500
+
+
+@app.route('/api/devices', methods=['GET'])
+def get_input_devices():
+    """API para obtener lista de dispositivos de entrada de audio"""
+    try:
+        devices = list_input_devices()
+        return jsonify({'success': True, 'devices': devices})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/config', methods=['POST'])
 def update_config():
-    """API para actualizar N_SUBBANDS"""
+    """API para actualizar N_SUBBANDS, DISTANCE_METRIC y MICROPHONE_ID"""
     try:
         data = request.get_json()
-        n_subbands = int(data.get('N_SUBBANDS', 8))
+        n_subbands = int(data.get('n_subbands', 8))
+        distance_metric = data.get('distance_metric', 'euclidean')
+        microphone_id = data.get('microphone_id')
         
+        # Validar subbandas
         if n_subbands < 2 or n_subbands > 32:
-            return jsonify({'success': False, 'error': 'N_SUBBANDS debe estar entre 2 y 32'}), 400
+            return jsonify({'success': False, 'error': 'n_subbands debe estar entre 2 y 32'}), 400
+        
+        # Validar métrica de distancia
+        valid_metrics = ['euclidean', 'weighted_euclidean', 'nll_gaussian']
+        if distance_metric not in valid_metrics:
+            return jsonify({'success': False, 'error': f'distance_metric debe ser una de: {valid_metrics}'}), 400
+        
+        # Validar microphone_id - solo validar que sea número entero
+        if microphone_id is not None:
+            try:
+                microphone_id = int(microphone_id)
+                # Aceptar cualquier índice >= 0 (validación en frontend)
+                if microphone_id < 0:
+                    return jsonify({'success': False, 'error': 'microphone_id debe ser >= 0'}), 400
+            except ValueError:
+                return jsonify({'success': False, 'error': 'microphone_id debe ser un número entero'}), 400
         
         # Actualizar config.py
         config_path = os.path.join(os.path.dirname(__file__), 'config.py')
         with open(config_path, 'r') as f:
             content = f.read()
         
-        # Reemplazar N_SUBBANDS
+        # Reemplazar valores
         import re
         content = re.sub(r'N_SUBBANDS = \d+', f'N_SUBBANDS = {n_subbands}', content)
+        content = re.sub(r"DISTANCE_METRIC = '[a-z_]+'", f"DISTANCE_METRIC = '{distance_metric}'", content)
+        
+        # Actualizar MICROPHONE_ID
+        if microphone_id is not None:
+            content = re.sub(r'MICROPHONE_ID = [^#\n]+', f'MICROPHONE_ID = {microphone_id}', content)
+        else:
+            content = re.sub(r'MICROPHONE_ID = [^#\n]+', 'MICROPHONE_ID = None', content)
         
         with open(config_path, 'w') as f:
             f.write(content)
         
-        return jsonify({'success': True, 'message': 'Subbandas actualizadas. Entrenar modelo ahora.'})
+        msg = f'Configuración actualizada: subbandas={n_subbands}, métrica={distance_metric}, micrófono={microphone_id or "defecto"}'
+        return jsonify({'success': True, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -345,16 +392,74 @@ def evaluation():
 
 @app.route('/api/evaluate', methods=['POST'])
 def evaluate():
-    """API para ejecutar evaluación"""
+    """
+    API para ejecutar evaluación con método de distancia seleccionado.
+    
+    Parámetros POST:
+    - distance_method: str - 'euclidean', 'weighted_euclidean', etc.
+                              Si es 'all', evalúa todos los métodos
+    """
     try:
-        from evaluate_model import evaluate_model
-        results = evaluate_model()
+        from evaluate_model import evaluate_model, evaluate_all_methods
         
-        if results is None:
-            return jsonify({'success': False, 'error': 'No se pudo completar la evaluación'}), 500
+        # Obtener el método de distancia solicitado
+        distance_method = request.json.get('distance_method', 'euclidean') if request.is_json else 'euclidean'
         
-        return jsonify({'success': True, 'results': results})
+        # Si se solicita 'all', evaluar todos los métodos
+        if distance_method == 'all':
+            all_results = evaluate_all_methods()
+            
+            if not all_results:
+                return jsonify({'success': False, 'error': 'No se pudo completar la evaluación'}), 500
+            
+            # Preparar respuesta con resultados de todos los métodos
+            # Ordenar por margen de error (menor es mejor)
+            sorted_methods = sorted(
+                all_results.items(),
+                key=lambda x: 100.0 - x[1]['porcentaje_acierto']
+            )
+            
+            best_method = sorted_methods[0][0] if sorted_methods else None
+            
+            return jsonify({
+                'success': True,
+                'all_results': {
+                    method: {
+                        'total_aciertos': result['total_aciertos'],
+                        'total_evaluaciones': result['total_evaluaciones'],
+                        'porcentaje_acierto': result['porcentaje_acierto'],
+                        'margen_error': 100.0 - result['porcentaje_acierto'],
+                        'distance_method': result['distance_method'],
+                        'por_comando': result['por_comando'],
+                        'predicciones': result.get('predicciones', [])
+                    }
+                    for method, result in all_results.items()
+                },
+                'best_method': best_method,
+                'comparison_order': [method for method, _ in sorted_methods]
+            })
+        else:
+            # Evaluar con el método específico solicitado
+            results = evaluate_model(distance_method=distance_method)
+            
+            if results is None:
+                return jsonify({'success': False, 'error': 'No se pudo completar la evaluación'}), 500
+            
+            return jsonify({
+                'success': True,
+                'results': {
+                    'total_aciertos': results['total_aciertos'],
+                    'total_evaluaciones': results['total_evaluaciones'],
+                    'porcentaje_acierto': results['porcentaje_acierto'],
+                    'margen_error': 100.0 - results['porcentaje_acierto'],
+                    'distance_method': results['distance_method'],
+                    'por_comando': results['por_comando'],
+                    'predicciones': results.get('predicciones', [])
+                }
+            })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -462,6 +567,142 @@ def not_found(e):
 def internal_error(e):
     """Manejador de error interno"""
     return render_template('500.html', error=str(e)), 500
+
+
+@app.route('/image-processing')
+def image_processing():
+    """Página interactiva de procesamiento de imagen con voz"""
+    return render_template('image_processing.html')
+
+
+@app.route('/api/image/grayscale', methods=['POST'])
+def api_grayscale():
+    """Convierte imagen a escala de grises"""
+    try:
+        from processing.image_interactive import pil_to_base64
+        from PIL import Image
+        
+        data = request.get_json()
+        image_base64 = data.get('image_base64')
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No hay imagen en base64'}), 400
+        
+        # Decodificar base64
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        
+        # Redimensionar a 256x256
+        pil_img = pil_img.resize((256, 256), Image.LANCZOS)
+        
+        # Convertir a escala de grises
+        gray_pil = pil_img.convert('L')
+        
+        # Convertir a base64 con prefijo data:image
+        base64_img = pil_to_base64(gray_pil)
+        full_base64 = f'data:image/png;base64,{base64_img}'
+        
+        return jsonify({
+            'success': True,
+            'image': full_base64
+        })
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/image/compress', methods=['POST'])
+def api_compress():
+    """Comprime imagen usando DCT"""
+    try:
+        from processing.image_interactive import apply_dct_compression, pil_to_base64
+        from PIL import Image
+        
+        data = request.get_json()
+        image_base64 = data.get('image_base64')
+        compression_percent = data.get('compression_percent', 50)
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No hay imagen'}), 400
+        
+        # Decodificar base64
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        gray_array = np.array(pil_img.convert('L'))
+        
+        # Aplicar compresión
+        compressed, magnitude, stats = apply_dct_compression(gray_array, compression_percent)
+        
+        # Convertir a base64
+        compressed_pil = Image.fromarray(compressed.astype('uint8'))
+        base64_img = pil_to_base64(compressed_pil)
+        full_base64 = f'data:image/png;base64,{base64_img}'
+        
+        # Convertir magnitud a lista serializable
+        magnitude_list = magnitude.tolist() if isinstance(magnitude, np.ndarray) else magnitude
+        
+        return jsonify({
+            'success': True,
+            'compressed_image': full_base64,
+            'dct_magnitude': magnitude_list,
+            'statistics': stats
+        })
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/image/reconstruct', methods=['POST'])
+def api_reconstruct():
+    """Reconstruye imagen desde DCT comprimida"""
+    try:
+        from processing.image_interactive import reconstruct_from_dct, pil_to_base64
+        from PIL import Image
+        
+        data = request.get_json()
+        image_base64 = data.get('image_base64')
+        compression_percent = data.get('compression_percent', 50)
+        mode = data.get('mode', 'grey')
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No hay imagen'}), 400
+        
+        # Decodificar base64
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        gray_array = np.array(pil_img.convert('L'))
+        
+        # Reconstruir
+        reconstructed, stats = reconstruct_from_dct(gray_array, compression_percent, mode)
+        
+        # Convertir a base64
+        reconstructed_pil = Image.fromarray(reconstructed.astype('uint8'))
+        base64_img = pil_to_base64(reconstructed_pil)
+        full_base64 = f'data:image/png;base64,{base64_img}'
+        
+        return jsonify({
+            'success': True,
+            'compressed_image': full_base64,
+            'statistics': stats
+        })
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/images')

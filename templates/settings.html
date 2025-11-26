@@ -1,0 +1,509 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="settings-wrapper">
+    <div class="settings-card">
+        <h2>⚙️ Configuración del Sistema</h2>
+        <p>Personaliza los parámetros de procesamiento de audio e imágenes</p>
+        
+        <div class="settings-section">
+            <h3>📊 Procesamiento de Audio</h3>
+            
+            <div class="config-group">
+                <label for="n_subbands">Número de Subbandas:</label>
+                <div class="input-wrapper">
+                    <input type="number" id="n_subbands" min="2" max="32" step="1" value="16" />
+                    <span class="help-text">Bandas de frecuencia para FFT (2-32)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h3>🎤 Dispositivo de Audio</h3>
+            
+            <div class="config-group">
+                <label for="microphone_id">Micrófono:</label>
+                <div class="input-wrapper">
+                    <select id="microphone_id">
+                        <option value="">Cargando dispositivos...</option>
+                    </select>
+                    <span class="help-text">Selecciona el micrófono para grabar datos de entrenamiento (en tiempo real se usa el predeterminado)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            
+            <div class="config-group">
+                <label for="distance_metric">Métrica de Distancia:</label>
+                <div class="input-wrapper">
+                    <select id="distance_metric">
+                        <option value="euclidean">Euclidiana - Distancia recta en el espacio</option>
+                        <option value="weighted_euclidean">Euclidiana Ponderada - Bandas estables contribuyen más</option>
+                        <option value="nll_gaussian">Verosimilitud Gaussiana - Probabilidad gaussiana</option>
+                    </select>
+                    <span class="help-text">Método para comparar comandos similares</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-actions">
+            <button id="saveBtn" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar Configuración
+            </button>
+            <button id="resetBtn" class="btn btn-secondary">
+                <i class="fas fa-redo"></i> Restablecer Valores por Defecto
+            </button>
+        </div>
+        
+        <div id="statusMessage" class="status-message" style="display:none;"></div>
+    </div>
+    
+    <div class="info-card">
+        <h3>ℹ️ Información Actual</h3>
+        <div class="info-content">
+            <p><strong>Subbandas:</strong> <span id="currentSubbands">16</span></p>
+            <p><strong>Métrica:</strong> <span id="currentMetric">euclidean</span></p>
+            <p><strong>Micrófono:</strong> <span id="currentMicrophone">Por defecto</span></p>
+            <p><strong>Última actualización:</strong> <span id="lastUpdate">Nunca</span></p>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-wrapper {
+    max-width: 900px;
+    margin: 2rem auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    padding: 0 2rem;
+}
+
+.settings-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border-top: 4px solid #0066cc;
+}
+
+.settings-card h2 {
+    color: #0066cc;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.settings-card > p {
+    color: #666;
+    margin: 0 0 2rem 0;
+    font-size: 0.95rem;
+}
+
+.settings-section {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #eee;
+}
+
+.settings-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.settings-section h3 {
+    color: #333;
+    font-size: 1.1rem;
+    margin: 0 0 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.config-group {
+    margin-bottom: 1.5rem;
+}
+
+.config-group label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.config-group input,
+.config-group select {
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.config-group input:focus,
+.config-group select:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.help-text {
+    font-size: 12px;
+    color: #999;
+    font-style: italic;
+}
+
+.settings-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0066cc, #004499);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+    background: #eeeeee;
+    border-color: #999;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.status-message {
+    margin-top: 1.5rem;
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    border-left: 4px solid transparent;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.status-message.success {
+    background: #d4edda;
+    color: #155724;
+    border-left-color: #28a745;
+}
+
+.status-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left-color: #dc3545;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #16a34a;
+    height: fit-content;
+}
+
+.info-card h3 {
+    color: #16a34a;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-content p {
+    margin: 0 0 1rem 0;
+    padding: 0.75rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+.info-content p:last-child {
+    margin-bottom: 0;
+}
+
+.info-content strong {
+    color: #333;
+    display: inline-block;
+    min-width: 120px;
+}
+
+.info-content span {
+    color: #0066cc;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .settings-wrapper {
+        grid-template-columns: 1fr;
+        padding: 0 1rem;
+        gap: 1.5rem;
+    }
+    
+    .settings-card {
+        padding: 1.5rem;
+    }
+    
+    .settings-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+const nSubbandsInput = document.getElementById('n_subbands');
+const distanceMetricSelect = document.getElementById('distance_metric');
+const microphoneIdSelect = document.getElementById('microphone_id');
+const saveBtn = document.getElementById('saveBtn');
+const resetBtn = document.getElementById('resetBtn');
+const statusMessage = document.getElementById('statusMessage');
+const currentSubbands = document.getElementById('currentSubbands');
+const currentMetric = document.getElementById('currentMetric');
+const currentMicrophone = document.getElementById('currentMicrophone');
+const lastUpdate = document.getElementById('lastUpdate');
+
+const DEFAULT_VALUES = {
+    n_subbands: 16,
+    distance_metric: 'euclidean',
+    microphone_id: ''
+};
+
+// Cargar dispositivos de audio disponibles
+async function loadInputDevices() {
+    try {
+        // Usar enumerateDevices() para obtener dispositivos de audio
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        
+        microphoneIdSelect.innerHTML = '';
+        
+        // Opción de dispositivo por defecto
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '🎤 Dispositivo por defecto';
+        microphoneIdSelect.appendChild(defaultOption);
+        
+        // Opciones de dispositivos detectados
+        audioInputs.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = index;  // Usar índice como valor
+            option.textContent = `🎤 ${device.label || 'Micrófono sin nombre'} (ID: ${device.deviceId.substring(0, 8)}...)`;
+            microphoneIdSelect.appendChild(option);
+        });
+        
+        // Cargar selección guardada
+        const saved_microphone_id = localStorage.getItem('microphone_id');
+        if (saved_microphone_id !== null && saved_microphone_id !== '') {
+            microphoneIdSelect.value = saved_microphone_id;
+        }
+        
+        // Actualizar display del micrófono actual
+        updateCurrentMicrophoneDisplay();
+        
+        console.log('✅ Dispositivos de audio cargados');
+    } catch (error) {
+        microphoneIdSelect.innerHTML = '<option value="">⚠️ Error cargando dispositivos</option>';
+        console.error('Error cargando dispositivos:', error);
+    }
+}
+
+// Cargar configuración guardada
+function loadSettings() {
+    const saved_n_subbands = localStorage.getItem('n_subbands');
+    const saved_distance_metric = localStorage.getItem('distance_metric');
+    const saved_microphone_id = localStorage.getItem('microphone_id');
+    const saved_timestamp = localStorage.getItem('settings_timestamp');
+    
+    if (saved_n_subbands) {
+        nSubbandsInput.value = parseInt(saved_n_subbands);
+        currentSubbands.textContent = saved_n_subbands;
+    } else {
+        nSubbandsInput.value = DEFAULT_VALUES.n_subbands;
+        currentSubbands.textContent = DEFAULT_VALUES.n_subbands;
+    }
+    
+    if (saved_distance_metric) {
+        distanceMetricSelect.value = saved_distance_metric;
+        currentMetric.textContent = saved_distance_metric;
+    } else {
+        distanceMetricSelect.value = DEFAULT_VALUES.distance_metric;
+        currentMetric.textContent = DEFAULT_VALUES.distance_metric;
+    }
+    
+    // Actualizar micrófono actual
+    updateCurrentMicrophoneDisplay();
+    
+    if (saved_timestamp) {
+        const date = new Date(parseInt(saved_timestamp));
+        lastUpdate.textContent = date.toLocaleString('es-ES');
+    }
+    
+    console.log('✅ Configuración cargada desde localStorage');
+}
+
+// Actualizar display del micrófono actual
+function updateCurrentMicrophoneDisplay() {
+    const saved_microphone_id = localStorage.getItem('microphone_id');
+    
+    if (!saved_microphone_id || saved_microphone_id === '') {
+        currentMicrophone.textContent = 'Por defecto';
+    } else {
+        // Buscar el nombre en el selector
+        const selectedOption = microphoneIdSelect.querySelector(`option[value="${saved_microphone_id}"]`);
+        if (selectedOption) {
+            currentMicrophone.textContent = selectedOption.textContent.replace('🎤 ', '');
+        } else {
+            currentMicrophone.textContent = `Dispositivo #${saved_microphone_id}`;
+        }
+    }
+}
+
+// Guardar configuración
+saveBtn.addEventListener('click', async () => {
+    const n_subbands = parseInt(nSubbandsInput.value);
+    const distance_metric = distanceMetricSelect.value;
+    const microphone_id = microphoneIdSelect.value === '' ? null : parseInt(microphoneIdSelect.value);
+    
+    // Validar
+    if (n_subbands < 2 || n_subbands > 32) {
+        showStatus('⚠️ Subbandas debe estar entre 2 y 32', 'error');
+        return;
+    }
+    
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Guardando...';
+    
+    try {
+        // Guardar en localStorage
+        localStorage.setItem('n_subbands', n_subbands);
+        localStorage.setItem('distance_metric', distance_metric);
+        localStorage.setItem('microphone_id', microphone_id === null ? '' : microphone_id);
+        localStorage.setItem('settings_timestamp', Date.now());
+        
+        // Actualizar backend
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                n_subbands: n_subbands,
+                distance_metric: distance_metric,
+                microphone_id: microphone_id
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus('✅ Configuración guardada correctamente', 'success');
+            currentSubbands.textContent = n_subbands;
+            currentMetric.textContent = distance_metric;
+            updateCurrentMicrophoneDisplay();
+            lastUpdate.textContent = new Date().toLocaleString('es-ES');
+            console.log('✅ Backend actualizado');
+        } else {
+            showStatus('⚠️ ' + (data.error || 'Error al guardar'), 'error');
+        }
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+        console.error('Error:', error);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar Configuración';
+    }
+});
+
+// Restablecer valores por defecto
+resetBtn.addEventListener('click', () => {
+    if (!confirm('¿Restablecer valores por defecto?')) return;
+    
+    nSubbandsInput.value = DEFAULT_VALUES.n_subbands;
+    distanceMetricSelect.value = DEFAULT_VALUES.distance_metric;
+    microphoneIdSelect.value = DEFAULT_VALUES.microphone_id;
+    
+    localStorage.setItem('n_subbands', DEFAULT_VALUES.n_subbands);
+    localStorage.setItem('distance_metric', DEFAULT_VALUES.distance_metric);
+    localStorage.setItem('microphone_id', DEFAULT_VALUES.microphone_id);
+    localStorage.setItem('settings_timestamp', Date.now());
+    
+    showStatus('✅ Valores restablecidos', 'success');
+    currentSubbands.textContent = DEFAULT_VALUES.n_subbands;
+    currentMetric.textContent = DEFAULT_VALUES.distance_metric;
+    updateCurrentMicrophoneDisplay();
+    lastUpdate.textContent = new Date().toLocaleString('es-ES');
+    
+    console.log('🔄 Configuración restablecida a valores por defecto');
+});
+
+function showStatus(message, type) {
+    statusMessage.textContent = message;
+    statusMessage.className = `status-message ${type}`;
+    statusMessage.style.display = 'block';
+    
+    setTimeout(() => {
+        statusMessage.style.display = 'none';
+    }, 4000);
+}
+
+// Cargar dispositivos y configuración al iniciar
+loadInputDevices();
+loadSettings();
+</script>
+{% endblock %}

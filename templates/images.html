@@ -4,45 +4,8 @@
 
 {% block content %}
 <div class="images-container">
-    <h1>Procesamiento de Imágenes con DCT 2D + Acciones por Voz</h1>
-    <p class="subtitle">Carga una imagen, procésala y ejecuta acciones mediante reconocimiento de voz</p>
-    
-    <!-- Sección de comandos y acciones -->
-    <div class="commands-actions-section">
-        <h2>Acciones Disponibles</h2>
-        <div class="commands-grid">
-            <div class="command-card">
-                <div class="command-icon" style="background: linear-gradient(135deg, #0066cc, #004499);">
-                    <i class="fas fa-microphone"></i>
-                </div>
-                <h4>Comando "UNO"</h4>
-                <p class="action-text" id="action-uno">Acción: Descargar Imagen Original</p>
-            </div>
-            <div class="command-card">
-                <div class="command-icon" style="background: linear-gradient(135deg, #16a34a, #15803d);">
-                    <i class="fas fa-microphone"></i>
-                </div>
-                <h4>Comando "DOS"</h4>
-                <p class="action-text" id="action-dos">Acción: Descargar DCT Filtrado</p>
-            </div>
-            <div class="command-card">
-                <div class="command-icon" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
-                    <i class="fas fa-microphone"></i>
-                </div>
-                <h4>Comando "TRES"</h4>
-                <p class="action-text" id="action-tres">Acción: Descargar Imagen Inversa</p>
-            </div>
-        </div>
-
-        <!-- Reconocimiento en vivo -->
-        <div class="recognition-box">
-            <div class="recognition-status" id="recognitionStatus">
-                <i class="fas fa-circle-stop"></i>
-                <span>Reconocimiento de Voz: Inactivo</span>
-            </div>
-            <div class="recognition-result" id="recognitionResult"></div>
-        </div>
-    </div>
+    <h1>Procesamiento de Imágenes con DCT 2D</h1>
+    <p class="subtitle">Carga una imagen, procésala y visualiza el análisis mediante DCT</p>
 
     <!-- Sección de carga -->
     <div class="upload-section">
@@ -203,112 +166,6 @@
     color: #666;
     margin-bottom: 30px;
     font-size: 14px;
-}
-
-/* Sección de comandos */
-.commands-actions-section {
-    background: linear-gradient(135deg, #f5f9ff 0%, #f0f8ff 100%);
-    border-radius: 12px;
-    padding: 30px;
-    margin-bottom: 40px;
-    border: 1px solid #ddd;
-}
-
-.commands-actions-section h2 {
-    color: #0066cc;
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-.commands-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.command-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.command-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.command-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 28px;
-    margin: 0 auto 15px;
-}
-
-.command-card h4 {
-    color: #333;
-    margin-bottom: 10px;
-    font-size: 16px;
-}
-
-.action-text {
-    color: #666;
-    font-size: 13px;
-    margin: 0;
-    font-weight: 500;
-}
-
-/* Recognition box */
-.recognition-box {
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    border: 2px solid #0066cc;
-}
-
-.recognition-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #666;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-.recognition-status i {
-    color: #999;
-    font-size: 18px;
-}
-
-.recognition-status.active i {
-    color: #16a34a;
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.recognition-result {
-    padding: 15px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    text-align: center;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #0066cc;
-    font-weight: 600;
 }
 
 /* Filter control */
@@ -726,9 +583,6 @@ document.addEventListener('DOMContentLoaded', function() {
     downloadFiltered.addEventListener('click', () => downloadImage('filtered'));
     downloadInverted.addEventListener('click', () => downloadImage('inverted'));
     
-    // Inicializar reconocimiento de voz
-    initializeVoiceRecognition();
-    
     function updateFilterValue(e) {
         filterValue.textContent = e.target.value;
     }
@@ -849,65 +703,6 @@ document.addEventListener('DOMContentLoaded', function() {
         link.href = imgElement.src;
         link.download = filename;
         link.click();
-    }
-    
-    function initializeVoiceRecognition() {
-        const recognitionStatus = document.getElementById('recognitionStatus');
-        const recognitionResult = document.getElementById('recognitionResult');
-        
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            recognitionResult.innerHTML = '⚠️ Reconocimiento de voz no soportado en este navegador';
-            return;
-        }
-        
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = 'es-ES';
-        
-        recognition.onstart = () => {
-            recognitionStatus.classList.add('active');
-            recognitionStatus.innerHTML = '<i class="fas fa-circle"></i><span>Escuchando...</span>';
-        };
-        
-        recognition.onresult = (event) => {
-            const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-            recognitionResult.innerHTML = `<strong>Detectado:</strong> "${transcript}"`;
-            
-            // Detectar comandos
-            if (transcript.includes('uno')) {
-                recognitionResult.innerHTML += '<br>✓ Descargando imagen original...';
-                setTimeout(() => downloadImage('original'), 500);
-            } else if (transcript.includes('dos')) {
-                recognitionResult.innerHTML += '<br>✓ Descargando imagen filtrada...';
-                setTimeout(() => downloadImage('filtered'), 500);
-            } else if (transcript.includes('tres')) {
-                recognitionResult.innerHTML += '<br>✓ Descargando imagen inversa...';
-                setTimeout(() => downloadImage('inverted'), 500);
-            }
-        };
-        
-        recognition.onerror = (event) => {
-            recognitionStatus.classList.remove('active');
-            recognitionResult.innerHTML = `❌ Error: ${event.error}`;
-        };
-        
-        recognition.onend = () => {
-            recognitionStatus.classList.remove('active');
-            recognitionStatus.innerHTML = '<i class="fas fa-circle-stop"></i><span>Reconocimiento de Voz: Inactivo</span>';
-        };
-        
-        // Botón para iniciar reconocimiento
-        recognitionStatus.addEventListener('click', () => {
-            if (recognitionStatus.classList.contains('active')) {
-                recognition.stop();
-            } else {
-                recognition.start();
-            }
-        });
-        
-        recognitionStatus.style.cursor = 'pointer';
     }
 });
 </script>

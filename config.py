@@ -10,7 +10,11 @@ TARGET_N = 44100         # tamaño FFT / tamaño de señal (usa potencia de 2 ce
                          # Si grabas DURATION*FS != TARGET_N, pad/trim en audio_utils.
 
 # FFT / subbands
-N_SUBBANDS = 32          # dividir espectro en subbandas
+N_SUBBANDS = 3          # dividir espectro en subbandas
+DISTANCE_METRIC = 'euclidean'  # métrica de distancia: euclidean, weighted_euclidean, nll_gaussian
+
+# Micrófono
+MICROPHONE_ID = 0# ID del micrófono (None = dispositivo por defecto)
 
 # Rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

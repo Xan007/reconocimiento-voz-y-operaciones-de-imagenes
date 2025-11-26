@@ -16,14 +16,23 @@ const AudioUtils = {
 
     /**
      * Obtiene permiso del usuario para acceder al micrófono
+     * Usa la configuración de micrófono guardada si está disponible
      */
     async requestMicrophoneAccess() {
         try {
+            // Si la función compartida está disponible, usarla
+            if (typeof getAudioOptions === 'function') {
+                const options = await getAudioOptions();
+                const stream = await navigator.mediaDevices.getUserMedia(options);
+                return stream;
+            }
+            
+            // Fallback si no está disponible
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             return stream;
         } catch (error) {
             console.error('Error al acceder al micrófono:', error);
-            throw new Error('No se pudo acceder al micrófono. Verifica los permisos.');
+            throw new Error('No se pudo acceder al micrófono. Verifica los permisos del navegador.');
         }
     },
 

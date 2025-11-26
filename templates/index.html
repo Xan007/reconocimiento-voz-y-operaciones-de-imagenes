@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
+<script src="{{ url_for('static', filename='js/audio-config.js') }}"></script>
+
 <div class="page-header">
     <h1><i class="fas fa-wave-square"></i> Reconocimiento en Tiempo Real</h1>
     <p class="subtitle">Graba un comando y obtén el reconocimiento instantáneo</p>
@@ -155,13 +157,8 @@
     // Inicializar grabadora de audio
     async function initRecorder() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
-                }
-            });
+            const options = await getAudioOptions();
+            const stream = await navigator.mediaDevices.getUserMedia(options);
             
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioContext.createMediaStreamSource(stream);
