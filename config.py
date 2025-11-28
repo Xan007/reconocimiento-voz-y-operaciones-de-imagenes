@@ -13,8 +13,13 @@ TARGET_N = 44100         # tamaño FFT / tamaño de señal (usa potencia de 2 ce
 N_SUBBANDS = 3          # dividir espectro en subbandas
 DISTANCE_METRIC = 'euclidean'  # métrica de distancia: euclidean, weighted_euclidean, nll_gaussian
 
+# Reconocimiento
+RECOGNITION_THRESHOLD = 15.0  # Umbral de distancia máxima para aceptar un comando
+                               # Si la distancia mínima es mayor que este valor, se rechaza
+                               # Ajusta según tus modelos (valores típicos: 5-20)
+
 # Micrófono
-MICROPHONE_ID = 0# ID del micrófono (None = dispositivo por defecto)
+MICROPHONE_ID = None# ID del micrófono (None = dispositivo por defecto)
 
 # Rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -37,13 +37,6 @@ env/
 *~
 .DS_Store
 
-# Audio data
-data/comandos/*/
-!data/comandos/.gitkeep
-
-# Models
-data/modelos/*.json
-
 # Logs
 *.log
 logs/

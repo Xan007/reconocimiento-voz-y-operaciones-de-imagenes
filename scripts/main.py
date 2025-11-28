@@ -66,7 +66,7 @@ def continuous_recognition():
                 # Esperar nuevos datos de audio (timeout para poder interrumpir)
                 try:
                     energies = audio_callback.queue.get(timeout=0.1)
-                    cmd, diffs = recognizer.compare_with_models(energies, models)
+                    cmd, diffs, is_valid = recognizer.compare_with_models(energies, models)
                     
                     #if cmd is not None:
                         #print(f"👉 Detectado: {cmd.upper()}")

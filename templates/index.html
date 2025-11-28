@@ -4,8 +4,17 @@
 <script src="{{ url_for('static', filename='js/audio-config.js') }}"></script>
 
 <div class="page-header">
-    <h1><i class="fas fa-wave-square"></i> Reconocimiento en Tiempo Real</h1>
-    <p class="subtitle">Graba un comando y obtén el reconocimiento instantáneo</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div>
+            <h1><i class="fas fa-wave-square"></i> Reconocimiento en Tiempo Real</h1>
+            <p class="subtitle">Graba un comando y obtén el reconocimiento instantáneo</p>
+        </div>
+        <a href="/audio-logs" style="text-decoration: none;">
+            <button style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-music"></i> Audios Grabados
+            </button>
+        </a>
+    </div>
 </div>
 
     <div class="recognition-container">
@@ -351,14 +360,11 @@
         }, 150);
 
         // Espectro - OCUPAR TODO EL ANCHO HORIZONTAL
-        const spectrumMagnitude = plotData.spectrum.y.map(val => {
-            // Convertir de dB a magnitud lineal: mag = 10^(dB/20)
-            return Math.pow(10, val / 20);
-        });
+        // Magnitud directa (sin conversión a dB)
         
         Plotly.newPlot('spectrumPlot', [{
             x: plotData.spectrum.x,
-            y: spectrumMagnitude,
+            y: plotData.spectrum.y,
             type: 'scatter',
             mode: 'lines',
             name: 'Espectro',
@@ -368,7 +374,7 @@
         }], {
             title: 'Espectro de Frecuencia Completo (0 - 22050 Hz)',
             xaxis: { title: 'Frecuencia (Hz)', zeroline: false },
-            yaxis: { title: 'Magnitud Lineal', zeroline: true },
+            yaxis: { title: '|X(f)|', zeroline: true },
             margin: { l: 50, r: 20, t: 40, b: 40 },
             responsive: true,
             autosize: true,

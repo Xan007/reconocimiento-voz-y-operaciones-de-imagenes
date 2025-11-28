@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audios Grabados - Lab Señales</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+
+        button.delete-all {
+            background: #e74c3c;
+        }
+
+        button.delete-all:hover {
+            background: #c0392b;
+        }
+
+        .audio-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .audio-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s;
+        }
+
+        .audio-item:hover {
+            background: #e9ecef;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .audio-item audio {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .audio-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .audio-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .audio-time {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .audio-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .audio-actions button {
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+
+        .download-btn {
+            background: #27ae60;
+        }
+
+        .download-btn:hover {
+            background: #229954;
+        }
+
+        .delete-btn {
+            background: #e74c3c;
+        }
+
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ddd;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .count-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <i class="fas fa-music"></i>
+            Audios Grabados
+            <span class="count-badge" id="count">0/5</span>
+        </h1>
+        <p class="subtitle">Últimos 5 audios de 1 segundo enviados al API</p>
+
+        <div id="status" class="status"></div>
+
+        <div class="controls">
+            <button onclick="loadAudioLogs()">
+                <i class="fas fa-sync"></i> Actualizar
+            </button>
+            <button class="delete-all" onclick="deleteAllAudios()">
+                <i class="fas fa-trash"></i> Eliminar Todo
+            </button>
+        </div>
+
+        <div id="audioList" class="audio-list">
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Cargando audios...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadAudioLogs() {
+            try {
+                const response = await fetch('/api/audio-logs');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayAudioLogs(data.audio_logs);
+                    document.getElementById('count').textContent = `${data.count}/5`;
+                } else {
+                    showStatus('Error al cargar audios: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        function displayAudioLogs(audioFiles) {
+            const audioList = document.getElementById('audioList');
+            
+            if (audioFiles.length === 0) {
+                audioList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-microphone-slash"></i>
+                        <p>No hay audios grabados aún</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Mostrar en orden inverso (más recientes primero)
+            const sortedFiles = [...audioFiles].reverse();
+            audioList.innerHTML = sortedFiles.map(filename => `
+                <div class="audio-item">
+                    <div class="audio-info">
+                        <div class="audio-name">${filename}</div>
+                        <div class="audio-time">Grabado: ${parseFileName(filename)}</div>
+                    </div>
+                    <audio controls style="flex: 1; max-width: 400px;">
+                        <source src="/api/audio-logs/${filename}" type="audio/wav">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    <div class="audio-actions">
+                        <a href="/api/audio-logs/${filename}" download="${filename}">
+                            <button class="download-btn">
+                                <i class="fas fa-download"></i> Descargar
+                            </button>
+                        </a>
+                        <button class="delete-btn" onclick="deleteAudio('${filename}')">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function parseFileName(filename) {
+            // Formato: audio_YYYYMMDD_HHMMSS_ms.wav
+            const match = filename.match(/audio_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})_(\d{3})/);
+            if (match) {
+                const [, year, month, day, hour, minute, second, ms] = match;
+                return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+            }
+            return filename;
+        }
+
+        async function deleteAudio(filename) {
+            if (!confirm(`¿Eliminar ${filename}?`)) return;
+
+            try {
+                // Eliminar directamente desde el servidor
+                const response = await fetch(`/api/audio-logs/${filename}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('Audio eliminado correctamente', 'success');
+                    loadAudioLogs();
+                } else {
+                    showStatus('Error al eliminar: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteAllAudios() {
+            if (!confirm('¿Eliminar TODOS los audios grabados? Esta acción no se puede deshacer.')) return;
+
+            try {
+                const response = await fetch('/api/audio-logs/delete-all', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('Todos los audios fueron eliminados', 'success');
+                    loadAudioLogs();
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Cargar audios al abrir la página
+        loadAudioLogs();
+
+        // Auto-actualizar cada 5 segundos
+        setInterval(loadAudioLogs, 5000);
+    </script>
+</body>
+</html>

@@ -1,16 +1,20 @@
 # trainer.py
 """
 Etapa de entrenamiento: obtiene los vectores de umbrales de energía por comando.
-Según el documento:
-  - Se procesan M grabaciones de cada comando
-  - Para cada grabación se calcula la energía en cada banda: E = (1/N) * sum(|X(k)|^2)
-  - Se promedian las energías de todas las grabaciones de un comando
-  - Se guardan como umbrales para reconocimiento
+
+PROCESO CORRECTO:
+  1. Se procesan M grabaciones de cada comando
+  2. Para cada grabación:
+     a) Dividir el audio en N_SUBBANDS segmentos temporales
+     b) Calcular la energía de cada segmento: E = (1/N) * sum(x[n]^2)
+     c) Normalizar las energías para que sumen 1
+  3. Promediar las energías de todas las grabaciones del comando
+  4. Guardar como umbrales para reconocimiento
 
 Algoritmo:
 1. Leer grabaciones del comando
 2. Normalizar y preparar audio
-3. Calcular FFT y energía por banda
+3. Dividir en subbandas temporales y calcular energía
 4. Promediar energías de todas las grabaciones (vector de umbrales)
 5. Guardar en JSON
 """
@@ -24,7 +28,7 @@ from config import COMANDOS_DIR, MODELOS_DIR
 
 def compute_command_features(command_name):
     """
-    Calcula las energías por subbanda para TODAS las grabaciones de un comando.
+    Calcula las energías por subbanda temporal para TODAS las grabaciones de un comando.
     
     Parámetros:
     -----------
@@ -37,8 +41,10 @@ def compute_command_features(command_name):
         Lista de vectores de energía, uno por grabación
         Cada vector tiene N_SUBBANDS elementos
     
-    Fórmula aplicada:
-    E = (1/N) * sum(|X(k)|^2)  para cada banda
+    Proceso:
+    1. Dividir audio en N_SUBBANDS segmentos temporales
+    2. Calcular energía de cada segmento: E = (1/N) * sum(x[n]^2)
+    3. Normalizar para que sumen 1
     """
     command_path = os.path.join(COMANDOS_DIR, command_name)
     if not os.path.isdir(command_path):

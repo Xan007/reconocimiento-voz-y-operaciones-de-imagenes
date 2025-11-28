@@ -1,0 +1,1706 @@
+{% extends 'base.html' %}
+
+{% block title %}Encriptación - FrDCT + DOST + Arnold{% endblock %}
+
+{% block content %}
+<style>
+:root {
+    --primary: #0066cc;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --gray: #666;
+}
+
+.encryption-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    color: var(--gray);
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 0.95rem;
+}
+
+.section-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 102, 204, 0.12);
+    margin-bottom: 1.5rem;
+    border-top: 4px solid var(--primary);
+}
+
+.section-card h2 {
+    color: var(--primary);
+    margin: 0 0 1rem 0;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-card h3 {
+    color: var(--primary);
+    margin: 1rem 0 0.8rem 0;
+    font-size: 1rem;
+}
+
+.upload-area {
+    border: 3px dashed var(--primary);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f8fafc;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.upload-area:hover {
+    background: rgba(0, 102, 204, 0.05);
+    border-color: #004499;
+}
+
+.upload-area.dragover {
+    background: rgba(0, 102, 204, 0.1);
+    border-color: #004499;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.upload-area p {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+.upload-area small {
+    color: var(--gray);
+}
+
+#imagePreview img {
+    max-height: 250px;
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.image-info {
+    font-size: 0.9rem;
+    color: var(--gray);
+    margin-top: 1rem;
+}
+
+/* Parameter sliders */
+.parameter-group {
+    margin: 1.5rem 0;
+}
+
+.parameter-group h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.slider-item {
+    margin-bottom: 1.5rem;
+}
+
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.slider-label .value-display {
+    background: rgba(0, 102, 204, 0.1);
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    color: var(--primary);
+    font-family: monospace;
+    font-weight: 700;
+}
+
+.form-range {
+    height: 6px;
+    border-radius: 3px;
+}
+
+.form-range::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 102, 204, 0.3);
+}
+
+.form-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 102, 204, 0.3);
+    border: none;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 1rem 0;
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.checkbox-item label {
+    cursor: pointer;
+    font-weight: 500;
+    color: #333;
+    margin: 0;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #004d99;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #16a34a;
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+    transform: translateY(-2px);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+
+.button-group .btn {
+    flex: 1;
+    min-width: 150px;
+    justify-content: center;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Status messages */
+.status-message {
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-message.success {
+    background: #dcfce7;
+    color: #166534;
+    border-left: 4px solid var(--success);
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left: 4px solid var(--danger);
+}
+
+.status-message.info {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-left: 4px solid #0ea5e9;
+}
+
+.status-message.warning {
+    background: #fffbeb;
+    color: #92400e;
+    border-left: 4px solid var(--warning);
+}
+
+/* Crop Modal */
+.crop-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.crop-modal-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.crop-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 1rem;
+}
+
+.crop-modal-header h2 {
+    color: var(--primary);
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.crop-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+    padding: 0;
+}
+
+.crop-close-btn:hover {
+    color: var(--danger);
+}
+
+.crop-info-box {
+    background: #fff7ed;
+    border-left: 4px solid var(--warning);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.crop-info-box p {
+    margin: 0 0 0.5rem 0;
+    color: #92400e;
+}
+
+.crop-info-box small {
+    color: #a16207;
+}
+
+.crop-canvas-container {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    margin: 1rem auto;
+    display: flex;
+    justify-content: center;
+}
+
+#cropCanvas {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    max-width: 100%;
+    cursor: crosshair;
+}
+
+.crop-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.crop-control-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.crop-control-item label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.crop-control-item input[type="number"] {
+    padding: 0.6rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1rem;
+    width: 100%;
+}
+
+.crop-control-item input[type="number"]:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+.crop-presets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+
+.crop-preset-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--primary);
+    background: white;
+    color: var(--primary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.crop-preset-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.crop-preset-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.crop-modal-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e5e7eb;
+}
+
+/* Info boxes */
+.info-box {
+    background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.info-box strong {
+    color: var(--primary);
+}
+
+/* Process visualization */
+.process-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.process-step {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    border: 2px solid #e0e7ff;
+    transition: all 0.3s ease;
+}
+
+.process-step:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+}
+
+.step-title {
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.step-description {
+    color: var(--gray);
+    font-size: 0.85rem;
+}
+
+.step-image {
+    width: 100%;
+    max-height: 250px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: white;
+    margin-top: 0.8rem;
+}
+
+.step-placeholder {
+    width: 100%;
+    height: 150px;
+    background: #e5e7eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray);
+    font-size: 0.85rem;
+    margin-top: 0.8rem;
+}
+
+/* Algorithm info */
+.algorithm-info {
+    background: #f0f7ff;
+    border-left: 4px solid var(--primary);
+    padding: 1.2rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+.algorithm-info h4 {
+    color: var(--primary);
+    margin: 0 0 0.8rem 0;
+}
+
+.algorithm-info ol {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: #333;
+}
+
+.algorithm-info li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Loading overlay */
+#loadingOverlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-message {
+    text-align: center;
+    color: white;
+}
+
+.loading-message .spinner {
+    margin-bottom: 1rem;
+}
+
+.loading-message h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .section-card {
+        padding: 1rem;
+    }
+    
+    .process-steps {
+        grid-template-columns: 1fr;
+    }
+    
+    .button-group .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<div class="encryption-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1>🔐 Encriptación de Imágenes RGB</h1>
+        <p>Encripta y desencripta imágenes usando FrDCT, DOST y Arnold Transform con máxima seguridad</p>
+    </div>
+
+    <!-- Row 1: Upload & Parameters -->
+    <div class="row">
+        <!-- Upload Section -->
+        <div class="col-lg-4">
+            <div class="section-card">
+                <h2>📤 Cargar Imagen</h2>
+                <div class="upload-area" id="uploadArea">
+                    <div>
+                        <div class="upload-icon">📁</div>
+                        <p><strong>Haz clic o arrastra una imagen</strong></p>
+                        <small>JPG, PNG, BMP | Máx 10MB</small>
+                    </div>
+                </div>
+                <input type="file" id="imageInput" accept="image/*" style="display:none;">
+                <div id="imagePreview"></div>
+                <div class="image-info" id="imageInfo"></div>
+                <button id="cropBtn" class="btn btn-sm btn-outline-primary" style="margin-top: 0.5rem; display:none;">
+                    <i class="fas fa-crop"></i> ✂️ Recortar
+                </button>
+            </div>
+        </div>
+
+        <!-- FrDCT Parameters -->
+        <div class="col-lg-4">
+            <div class="section-card">
+                <h2>🎚️ Parámetros FrDCT (α)</h2>
+                
+                <div class="checkbox-item">
+                    <input type="checkbox" id="syncAlphas" checked>
+                    <label for="syncAlphas">Sincronizar canales RGB</label>
+                </div>
+
+                <div class="parameter-group">
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><span class="badge badge-danger">R</span> α₁</span>
+                            <span class="value-display" id="alphaRValue">0.50</span>
+                        </div>
+                        <input type="range" class="form-range" id="alphaR" min="0" max="1.99" step="0.01" value="0.5">
+                    </div>
+
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><span class="badge badge-success">G</span> α₂</span>
+                            <span class="value-display" id="alphaGValue">0.50</span>
+                        </div>
+                        <input type="range" class="form-range" id="alphaG" min="0" max="1.99" step="0.01" value="0.5">
+                    </div>
+
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><span class="badge badge-primary">B</span> α₃</span>
+                            <span class="value-display" id="alphaBValue">0.50</span>
+                        </div>
+                        <input type="range" class="form-range" id="alphaB" min="0" max="1.99" step="0.01" value="0.5">
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>ℹ️ Rango de α:</strong> [0, 2)
+                    <br><small>0=Transformada Identidad | 1=DCT Estándar</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arnold Parameters -->
+        <div class="col-lg-4">
+            <div class="section-card">
+                <h2>🔑 Parámetros Arnold</h2>
+
+                <div class="parameter-group">
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><strong>a</strong> (Parámetro caótico)</span>
+                            <span class="value-display" id="arnoldAValue">1</span>
+                        </div>
+                        <input type="range" class="form-range" id="arnoldA" min="1" max="10" step="1" value="1">
+                    </div>
+
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><strong>k</strong> (Iteraciones)</span>
+                            <span class="value-display" id="arnoldKValue">1</span>
+                        </div>
+                        <input type="range" class="form-range" id="arnoldK" min="1" max="20" step="1" value="1">
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 1.5rem; color: var(--primary);">📦 Compresión</h3>
+                <div class="parameter-group">
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span><strong>%</strong> Compresión</span>
+                            <span class="value-display" id="compressionValue">0%</span>
+                        </div>
+                        <input type="range" class="form-range" id="compressionPercent" min="0" max="99" step="1" value="0">
+                    </div>
+                </div>
+                <div class="info-box" style="background: #f0fdf4; border-left-color: #22c55e; font-size: 0.8rem;">
+                    <strong style="color: #166534;">📦 Compresión:</strong>
+                    <br><small>Pone a 0 el X% de coeficientes más pequeños (por magnitud). Mayor compresión = menor calidad pero más rápido.</small>
+                </div>
+
+                <div class="info-box" style="background: #fff7ed; border-left-color: var(--warning);">
+                    <strong style="color: #b45309;">⚠️ Clave de Cifrado:</strong>
+                    <br><small>(α₁, α₂, α₃, a, k, %) - ¡Guárdala para desencriptar!</small>
+                </div>
+
+                <div class="button-group">
+                    <button id="encryptBtn" class="btn btn-success" disabled>
+                        <i class="fas fa-lock"></i> Encriptar
+                    </button>
+                    <button id="decryptBtn" class="btn btn-primary" disabled>
+                        <i class="fas fa-unlock"></i> Desencriptar
+                    </button>
+                </div>
+                
+                <!-- Botones para guardar/cargar datos cifrados -->
+                <div class="button-group" style="margin-top: 0.5rem;">
+                    <button id="downloadDataBtn" class="btn btn-warning" disabled style="font-size: 0.85rem; padding: 0.6rem 1rem;">
+                        <i class="fas fa-download"></i> Guardar .enc
+                    </button>
+                    <button id="loadDataBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">
+                        <i class="fas fa-upload"></i> Cargar .enc
+                    </button>
+                </div>
+                <input type="file" id="encDataInput" accept=".enc,.json" style="display:none;">
+                
+                <div class="info-box" style="margin-top: 0.5rem; background: #fef3c7; border-left-color: #f59e0b; font-size: 0.8rem;">
+                    <strong style="color: #92400e;">💾 Importante:</strong>
+                    <br><small>Para desencriptar después de recargar, guarda el archivo .enc (contiene datos complejos necesarios)</small>
+                    <br><small style="color: #991b1b; margin-top: 0.3rem; display: block;">⚠️ Tamaño máximo: 200MB (~512x512px). Imágenes más grandes pueden no caber.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Algorithm Info -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="algorithm-info">
+                <h4>🔐 Algoritmo 5: Encriptación</h4>
+                <ol>
+                    <li>Dividir la imagen RGB en planos R, G, B</li>
+                    <li>Aplicar FrDCT con α₁, α₂, α₃ a cada plano</li>
+                    <li>Aplicar DOST a cada resultado de FrDCT</li>
+                    <li>Aplicar Compresión: poner a 0 el X% de coeficientes más pequeños</li>
+                    <li>Aplicar Transformación de Arnold E(α, S) con parámetros (a, k)</li>
+                    <li>Concatenar para obtener la imagen RGB cifrada</li>
+                </ol>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="algorithm-info">
+                <h4>🔓 Algoritmo 6: Desencriptación</h4>
+                <ol>
+                    <li>Dividir la imagen RGB cifrada en planos R, G, B</li>
+                    <li>Aplicar Transformación de Arnold inversa D(E(α, S)) con (a, k)</li>
+                    <li>Aplicar DOST inversa a cada canal (los ceros permanecen)</li>
+                    <li>Aplicar FrDCT inversa con los mismos α₁, α₂, α₃</li>
+                    <li>Concatenar para obtener la imagen RGB descifrada</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encryption Process -->
+    <div id="encryptionSteps" style="display:none; margin-top: 2rem;">
+        <div class="section-card">
+            <h2>📊 Proceso de Encriptación (Algorithm 5)</h2>
+            <div class="process-steps">
+                <div class="process-step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Original</div>
+                    <div class="step-description">Imagen RGB</div>
+                    <img id="step1Img" class="step-image" alt="Original" style="display:none;">
+                    <div class="step-placeholder" id="step1Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">FrDCT</div>
+                    <div class="step-description">Con α₁, α₂, α₃</div>
+                    <img id="step2Img" class="step-image" alt="FrDCT" style="display:none;">
+                    <div class="step-placeholder" id="step2Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">DOST</div>
+                    <div class="step-description">Decorrelación</div>
+                    <img id="step3Img" class="step-image" alt="DOST" style="display:none;">
+                    <div class="step-placeholder" id="step3Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">📦 Compresión</div>
+                    <div class="step-description" id="compressionStepDesc">0% eliminado</div>
+                    <img id="step4Img" class="step-image" alt="Compressed" style="display:none;">
+                    <div class="step-placeholder" id="step4Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">5</div>
+                    <div class="step-title">Arnold</div>
+                    <div class="step-description">E(α, S) Cifrada</div>
+                    <img id="step5Img" class="step-image" alt="Encrypted" style="display:none;">
+                    <div class="step-placeholder" id="step5Placeholder">Cargando...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decryption Process -->
+    <div id="decryptionSteps" style="display:none; margin-top: 2rem;">
+        <div class="section-card">
+            <h2>🔓 Proceso de Desencriptación (Algorithm 6)</h2>
+            <div class="process-steps">
+                <div class="process-step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Cifrada</div>
+                    <div class="step-description">E(α, S)</div>
+                    <img id="decStep1Img" class="step-image" alt="Encrypted" style="display:none;">
+                    <div class="step-placeholder" id="decStep1Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Arnold⁻¹</div>
+                    <div class="step-description">Descifrado D(E)</div>
+                    <img id="decStep2Img" class="step-image" alt="Arnold Inverse" style="display:none;">
+                    <div class="step-placeholder" id="decStep2Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">IDOST</div>
+                    <div class="step-description">Inversa DOST</div>
+                    <img id="decStep3Img" class="step-image" alt="IDOST" style="display:none;">
+                    <div class="step-placeholder" id="decStep3Placeholder">Cargando...</div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">IFrDCT</div>
+                    <div class="step-description">Imagen Recuperada</div>
+                    <img id="decStep4Img" class="step-image" alt="Decrypted" style="display:none;">
+                    <div class="step-placeholder" id="decStep4Placeholder">Cargando...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crop Modal -->
+    <div id="cropModal" class="crop-modal">
+        <div class="crop-modal-content">
+            <div class="crop-modal-header">
+                <h2>✂️ Recortar Imagen a Cuadrado</h2>
+                <button class="crop-close-btn" id="cropCloseBtn">&times;</button>
+            </div>
+            
+            <div class="crop-info-box">
+                <p><strong>⚠️ La imagen no es cuadrada</strong></p>
+                <p>La Transformación de Arnold requiere imágenes cuadradas (N × N).</p>
+                <small>Selecciona el área cuadrada que deseas conservar haciendo clic y arrastrando sobre la imagen, o usa los controles de posición.</small>
+            </div>
+            
+            <div class="crop-canvas-container">
+                <canvas id="cropCanvas"></canvas>
+            </div>
+            
+            <div style="text-align: center; margin: 0.5rem 0;">
+                <span id="cropSizeDisplay" style="font-weight: 600; color: var(--primary);"></span>
+            </div>
+            
+            <h4 style="margin: 1rem 0 0.5rem 0; color: var(--primary);">📐 Tamaños predefinidos:</h4>
+            <div class="crop-presets" id="cropPresets">
+                <!-- Se llenan dinámicamente -->
+            </div>
+            
+            <div class="crop-controls">
+                <div class="crop-control-item">
+                    <label>Posición X:</label>
+                    <input type="number" id="cropX" min="0" value="0">
+                </div>
+                <div class="crop-control-item">
+                    <label>Posición Y:</label>
+                    <input type="number" id="cropY" min="0" value="0">
+                </div>
+                <div class="crop-control-item">
+                    <label>Tamaño (N × N):</label>
+                    <input type="number" id="cropSize" min="1" value="256">
+                </div>
+            </div>
+            
+            <div class="crop-modal-footer">
+                <button class="btn btn-danger" id="cropCancelBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn btn-success" id="cropApplyBtn">
+                    <i class="fas fa-crop"></i> Recortar y Continuar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div class="loading-message">
+            <div class="spinner"></div>
+            <h3 id="loadingText">Procesando...</h3>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elements
+    const imageInput = document.getElementById('imageInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const imagePreview = document.getElementById('imagePreview');
+    const imageInfo = document.getElementById('imageInfo');
+    const cropBtn = document.getElementById('cropBtn');
+    const encryptBtn = document.getElementById('encryptBtn');
+    const decryptBtn = document.getElementById('decryptBtn');
+    const downloadDataBtn = document.getElementById('downloadDataBtn');
+    const loadDataBtn = document.getElementById('loadDataBtn');
+    const encDataInput = document.getElementById('encDataInput');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    
+    // Sliders
+    const alphaR = document.getElementById('alphaR');
+    const alphaG = document.getElementById('alphaG');
+    const alphaB = document.getElementById('alphaB');
+    const arnoldA = document.getElementById('arnoldA');
+    const arnoldK = document.getElementById('arnoldK');
+    const syncAlphas = document.getElementById('syncAlphas');
+    
+    // Value displays
+    const alphaRValue = document.getElementById('alphaRValue');
+    const alphaGValue = document.getElementById('alphaGValue');
+    const alphaBValue = document.getElementById('alphaBValue');
+    const arnoldAValue = document.getElementById('arnoldAValue');
+    const arnoldKValue = document.getElementById('arnoldKValue');
+    
+    // State
+    let originalImageBase64 = null;  // ORIGINAL - nunca se modifica
+    let currentImageBase64 = null;   // Para mostrar en preview (original, cifrada o descifrada)
+        let workingImageBase64 = null;   // Imagen en uso para operaciones (recortes/temp)
+        let encryptedData = null;
+    let originalImageForCrop = null;
+    let cropImageWidth = 0;
+    let cropImageHeight = 0;
+    
+    // Crop modal elements
+    const cropModal = document.getElementById('cropModal');
+    const cropCanvas = document.getElementById('cropCanvas');
+    const cropCtx = cropCanvas.getContext('2d');
+    const cropX = document.getElementById('cropX');
+    const cropY = document.getElementById('cropY');
+    const cropSize = document.getElementById('cropSize');
+    const cropSizeDisplay = document.getElementById('cropSizeDisplay');
+    const cropPresets = document.getElementById('cropPresets');
+    const cropCloseBtn = document.getElementById('cropCloseBtn');
+    const cropCancelBtn = document.getElementById('cropCancelBtn');
+    const cropApplyBtn = document.getElementById('cropApplyBtn');
+    
+    // Crop state
+    let cropImg = null;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let canvasScale = 1;
+    
+    // Image loading
+    uploadArea.addEventListener('click', () => imageInput.click());
+    
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) {
+            loadImage(e.dataTransfer.files[0]);
+        }
+    });
+    
+    imageInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+            loadImage(e.target.files[0]);
+        }
+    });
+    
+    // Botón para abrir el modal de recorte
+    cropBtn.addEventListener('click', () => {
+        if (!currentImageBase64) {
+            alert('Por favor carga una imagen primero.');
+            return;
+        }
+        const img = new Image();
+        img.onload = () => {
+            showCropModal(currentImageBase64, img.width, img.height);
+        };
+        img.src = currentImageBase64;
+    });
+    
+    function loadImage(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            // Guardar la imagen ORIGINAL
+            originalImageBase64 = e.target.result;
+            workingImageBase64 = originalImageBase64; // imagen en uso (puede cambiarse al recortar)
+            currentImageBase64 = originalImageBase64;  // Display la original
+            encryptedData = null;
+
+            // Limpiar estados de encriptación/desencriptación
+            document.getElementById('encryptionSteps').style.display = 'none';
+            document.getElementById('decryptionSteps').style.display = 'none';
+
+            const img = new Image();
+            img.onload = () => {
+                imagePreview.innerHTML = `<img src="${currentImageBase64}" style="max-height: 200px; margin-top: 1rem;">`;
+                imageInfo.textContent = `${img.width} × ${img.height} pixels`;
+                encryptBtn.disabled = false;
+                decryptBtn.disabled = false;
+                cropBtn.style.display = 'inline-block';  // Mostrar botón de recorte
+                // Allow re-selecting the same file again by clearing the input value
+                try { imageInput.value = ''; } catch (err) { /* ignore */ }
+            };
+            img.src = currentImageBase64;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    // Slider updates
+    alphaR.addEventListener('input', function() {
+        alphaRValue.textContent = parseFloat(this.value).toFixed(2);
+        if (syncAlphas.checked) {
+            alphaG.value = this.value;
+            alphaB.value = this.value;
+            alphaGValue.textContent = parseFloat(this.value).toFixed(2);
+            alphaBValue.textContent = parseFloat(this.value).toFixed(2);
+        }
+    });
+    
+    alphaG.addEventListener('input', function() {
+        alphaGValue.textContent = parseFloat(this.value).toFixed(2);
+        if (syncAlphas.checked) {
+            alphaR.value = this.value;
+            alphaB.value = this.value;
+            alphaRValue.textContent = parseFloat(this.value).toFixed(2);
+            alphaBValue.textContent = parseFloat(this.value).toFixed(2);
+        }
+    });
+    
+    alphaB.addEventListener('input', function() {
+        alphaBValue.textContent = parseFloat(this.value).toFixed(2);
+        if (syncAlphas.checked) {
+            alphaR.value = this.value;
+            alphaG.value = this.value;
+            alphaRValue.textContent = parseFloat(this.value).toFixed(2);
+            alphaGValue.textContent = parseFloat(this.value).toFixed(2);
+        }
+    });
+    
+    arnoldA.addEventListener('input', function() {
+        arnoldAValue.textContent = this.value;
+    });
+    
+    arnoldK.addEventListener('input', function() {
+        arnoldKValue.textContent = this.value;
+    });
+    
+    // Compression slider
+    const compressionSlider = document.getElementById('compressionPercent');
+    const compressionValueDisplay = document.getElementById('compressionValue');
+    compressionSlider.addEventListener('input', function() {
+        compressionValueDisplay.textContent = this.value + '%';
+    });
+    
+    // Encrypt
+    encryptBtn.addEventListener('click', async () => {
+        if (!currentImageBase64) {
+            alert('Por favor, carga una imagen primero');
+            return;
+        }
+        
+        // Primero verificar si la imagen es cuadrada
+        const img = new Image();
+        img.onload = async () => {
+            if (img.width !== img.height) {
+                // Mostrar modal de recorte
+                showCropModal(currentImageBase64, img.width, img.height);
+                return;
+            }
+            
+            // Si es cuadrada, proceder con encriptación
+            await performEncryption();
+        };
+        img.src = currentImageBase64;
+    });
+    
+    async function performEncryption() {
+        showLoading('Encriptando imagen...');
+        
+        try {
+                const response = await fetch('/api/encryption/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: workingImageBase64,  // USAR la imagen en uso (no modifica la original)
+                    alpha_r: parseFloat(alphaR.value),
+                    alpha_g: parseFloat(alphaG.value),
+                    alpha_b: parseFloat(alphaB.value),
+                    arnold_a: parseInt(arnoldA.value),
+                    arnold_k: parseInt(arnoldK.value),
+                    compression: parseInt(compressionSlider.value)
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                encryptedData = data.encrypted_data;
+                
+                // Show encryption steps
+                document.getElementById('encryptionSteps').style.display = 'block';
+                document.getElementById('decryptionSteps').style.display = 'none';
+                
+                // Orden: Original → FrDCT → DOST → Compresión → Arnold
+                showImage('step1Img', 'step1Placeholder', data.original);
+                showImage('step2Img', 'step2Placeholder', data.after_frdct);     // FrDCT
+                showImage('step3Img', 'step3Placeholder', data.after_dost);      // DOST
+                showImage('step4Img', 'step4Placeholder', data.after_compress);  // Compresión
+                showImage('step5Img', 'step5Placeholder', data.encrypted);       // Arnold
+                
+                // Actualizar descripción del paso de compresión
+                const compressionPercent = parseInt(compressionSlider.value);
+                document.getElementById('compressionStepDesc').textContent = compressionPercent + '% eliminado';
+                
+                // Update preview a la imagen CIFRADA (solo para mostrar)
+                currentImageBase64 = data.encrypted;  // Solo para display, NO se usa para encriptar
+                imagePreview.innerHTML = `<img src="${currentImageBase64}" style="max-height: 200px; margin-top: 1rem;">`;
+                imageInfo.textContent = '🔐 Imagen cifrada';
+                
+                // Enable download button
+                downloadDataBtn.disabled = false;
+                
+            } else {
+                // Verificar si requiere recorte
+                if (data.requires_crop) {
+                    // Mostrar modal para recortar la imagen en uso
+                    showCropModal(workingImageBase64 || originalImageBase64, data.width, data.height);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+        
+        hideLoading();
+    }
+    
+    // ==================== CROP FUNCTIONALITY ====================
+    
+    function showCropModal(imageBase64, width, height) {
+        originalImageForCrop = imageBase64;
+        cropImageWidth = width;
+        cropImageHeight = height;
+        
+        cropImg = new Image();
+        cropImg.onload = () => {
+            // Calcular escala para que quepa en el canvas
+            const maxCanvasWidth = 700;
+            const maxCanvasHeight = 500;
+            
+            canvasScale = Math.min(maxCanvasWidth / width, maxCanvasHeight / height, 1);
+            
+            cropCanvas.width = width * canvasScale;
+            cropCanvas.height = height * canvasScale;
+            
+            // Valores iniciales
+            const maxSize = Math.min(width, height);
+            cropSize.max = maxSize;
+            cropSize.value = maxSize;
+            cropX.max = width - 1;
+            cropY.max = height - 1;
+            cropX.value = Math.floor((width - maxSize) / 2);
+            cropY.value = Math.floor((height - maxSize) / 2);
+            
+            // Generar presets
+            generateCropPresets(width, height);
+            
+            // Dibujar
+            drawCropCanvas();
+            updateCropSizeDisplay();
+            
+            cropModal.style.display = 'flex';
+        };
+        cropImg.src = imageBase64;
+    }
+    
+    function generateCropPresets(width, height) {
+        cropPresets.innerHTML = '';
+        const maxSize = Math.min(width, height);
+        
+        // Presets comunes de potencias de 2
+        const commonSizes = [64, 128, 256, 384, 512, 768, 1024].filter(s => s <= maxSize);
+        
+        // Agregar el tamaño máximo si no está en la lista
+        if (!commonSizes.includes(maxSize) && maxSize > 0) {
+            commonSizes.push(maxSize);
+            commonSizes.sort((a, b) => a - b);
+        }
+        
+        commonSizes.forEach(size => {
+            const btn = document.createElement('button');
+            btn.className = 'crop-preset-btn';
+            btn.textContent = `${size} × ${size}`;
+            btn.onclick = () => {
+                cropSize.value = size;
+                // Centrar el recorte
+                cropX.value = Math.floor((width - size) / 2);
+                cropY.value = Math.floor((height - size) / 2);
+                drawCropCanvas();
+                updateCropSizeDisplay();
+                
+                // Actualizar botones activos
+                document.querySelectorAll('.crop-preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            };
+            cropPresets.appendChild(btn);
+        });
+    }
+    
+    function drawCropCanvas() {
+        if (!cropImg) return;
+        
+        // Dibujar imagen
+        cropCtx.drawImage(cropImg, 0, 0, cropCanvas.width, cropCanvas.height);
+        
+        // Dibujar overlay semitransparente
+        cropCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+        
+        // Dibujar área de recorte
+        const x = parseInt(cropX.value) * canvasScale;
+        const y = parseInt(cropY.value) * canvasScale;
+        const size = parseInt(cropSize.value) * canvasScale;
+        
+        // Limpiar el área de recorte para mostrar la imagen
+        cropCtx.clearRect(x, y, size, size);
+        cropCtx.drawImage(cropImg, 0, 0, cropCanvas.width, cropCanvas.height);
+        
+        // Volver a dibujar el overlay excepto en el área de recorte
+        cropCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        cropCtx.fillRect(0, 0, cropCanvas.width, y); // Top
+        cropCtx.fillRect(0, y, x, size); // Left
+        cropCtx.fillRect(x + size, y, cropCanvas.width - x - size, size); // Right
+        cropCtx.fillRect(0, y + size, cropCanvas.width, cropCanvas.height - y - size); // Bottom
+        
+        // Dibujar borde del área de recorte
+        cropCtx.strokeStyle = '#22c55e';
+        cropCtx.lineWidth = 3;
+        cropCtx.strokeRect(x, y, size, size);
+        
+        // Dibujar líneas guía
+        cropCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        cropCtx.lineWidth = 1;
+        cropCtx.setLineDash([5, 5]);
+        
+        // Líneas horizontales
+        cropCtx.beginPath();
+        cropCtx.moveTo(x, y + size/3);
+        cropCtx.lineTo(x + size, y + size/3);
+        cropCtx.moveTo(x, y + 2*size/3);
+        cropCtx.lineTo(x + size, y + 2*size/3);
+        // Líneas verticales
+        cropCtx.moveTo(x + size/3, y);
+        cropCtx.lineTo(x + size/3, y + size);
+        cropCtx.moveTo(x + 2*size/3, y);
+        cropCtx.lineTo(x + 2*size/3, y + size);
+        cropCtx.stroke();
+        cropCtx.setLineDash([]);
+    }
+    
+    function updateCropSizeDisplay() {
+        const size = parseInt(cropSize.value);
+        cropSizeDisplay.textContent = `Recorte: ${size} × ${size} píxeles`;
+    }
+    
+    // Crop canvas mouse events
+    cropCanvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        const rect = cropCanvas.getBoundingClientRect();
+        dragStartX = (e.clientX - rect.left) / canvasScale;
+        dragStartY = (e.clientY - rect.top) / canvasScale;
+    });
+    
+    cropCanvas.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const rect = cropCanvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) / canvasScale;
+        const mouseY = (e.clientY - rect.top) / canvasScale;
+        
+        const size = parseInt(cropSize.value);
+        let newX = Math.round(mouseX - size / 2);
+        let newY = Math.round(mouseY - size / 2);
+        
+        // Limitar a los bordes
+        newX = Math.max(0, Math.min(cropImageWidth - size, newX));
+        newY = Math.max(0, Math.min(cropImageHeight - size, newY));
+        
+        cropX.value = newX;
+        cropY.value = newY;
+        
+        drawCropCanvas();
+    });
+    
+    cropCanvas.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+    
+    cropCanvas.addEventListener('mouseleave', () => {
+        isDragging = false;
+    });
+    
+    // Input changes
+    cropX.addEventListener('input', () => {
+        const maxX = cropImageWidth - parseInt(cropSize.value);
+        cropX.value = Math.max(0, Math.min(maxX, parseInt(cropX.value)));
+        drawCropCanvas();
+    });
+    
+    cropY.addEventListener('input', () => {
+        const maxY = cropImageHeight - parseInt(cropSize.value);
+        cropY.value = Math.max(0, Math.min(maxY, parseInt(cropY.value)));
+        drawCropCanvas();
+    });
+    
+    cropSize.addEventListener('input', () => {
+        const maxSize = Math.min(cropImageWidth, cropImageHeight);
+        cropSize.value = Math.max(1, Math.min(maxSize, parseInt(cropSize.value)));
+        
+        // Ajustar posición si es necesario
+        const size = parseInt(cropSize.value);
+        if (parseInt(cropX.value) + size > cropImageWidth) {
+            cropX.value = cropImageWidth - size;
+        }
+        if (parseInt(cropY.value) + size > cropImageHeight) {
+            cropY.value = cropImageHeight - size;
+        }
+        
+        drawCropCanvas();
+        updateCropSizeDisplay();
+    });
+    
+    // Close modal
+    cropCloseBtn.addEventListener('click', () => {
+        cropModal.style.display = 'none';
+    });
+    
+    cropCancelBtn.addEventListener('click', () => {
+        cropModal.style.display = 'none';
+    });
+    
+    // Apply crop
+    cropApplyBtn.addEventListener('click', async () => {
+        const x = parseInt(cropX.value);
+        const y = parseInt(cropY.value);
+        const size = parseInt(cropSize.value);
+        
+        showLoading('Recortando imagen...');
+        cropModal.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/encryption/crop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: originalImageForCrop,
+                    x: x,
+                    y: y,
+                    size: size
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Use the cropped image as the current working image (do NOT overwrite original)
+                workingImageBase64 = data.cropped_image;
+                currentImageBase64 = data.cropped_image;
+
+                // Actualizar preview
+                imagePreview.innerHTML = `<img src="${currentImageBase64}" style="max-height: 200px; margin-top: 1rem;">`;
+                imageInfo.textContent = `${size} × ${size} pixels (recortada)`;
+                
+                hideLoading();
+            } else {
+                hideLoading();
+                alert('Error al recortar: ' + data.error);
+            }
+        } catch (error) {
+            hideLoading();
+            alert('Error: ' + error.message);
+        }
+    });
+    
+    // Decrypt
+    decryptBtn.addEventListener('click', async () => {
+        if (!currentImageBase64 && !encryptedData) {
+            alert('Por favor, carga una imagen cifrada o encripta una imagen primero');
+            return;
+        }
+        
+        showLoading('Desencriptando imagen...');
+        
+        try {
+            // Preparar datos para envío
+            const requestData = {
+                image: currentImageBase64,
+                encrypted_data: encryptedData,
+                alpha_r: parseFloat(alphaR.value),
+                alpha_g: parseFloat(alphaG.value),
+                alpha_b: parseFloat(alphaB.value),
+                arnold_a: parseInt(arnoldA.value),
+                arnold_k: parseInt(arnoldK.value),
+                compression: parseInt(compressionSlider.value)
+            };
+            
+            // Si los datos son muy grandes, alertar al usuario
+            const dataSize = JSON.stringify(requestData).length / (1024 * 1024);
+            if (dataSize > 50) {
+                console.warn(`Tamaño de datos: ${dataSize.toFixed(2)} MB - esto puede tardar...`);
+            }
+            
+            const response = await fetch('/api/encryption/decrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show decryption steps
+                document.getElementById('decryptionSteps').style.display = 'block';
+                document.getElementById('encryptionSteps').style.display = 'none';
+                
+                // Orden: Cifrada → Arnold⁻¹ → IDOST → IFrDCT (recuperada)
+                showImage('decStep1Img', 'decStep1Placeholder', data.encrypted);
+                showImage('decStep2Img', 'decStep2Placeholder', data.after_arnold_inv);
+                showImage('decStep3Img', 'decStep3Placeholder', data.after_idost);
+                showImage('decStep4Img', 'decStep4Placeholder', data.decrypted);  // IFrDCT = recuperada
+                
+                // Update preview - mostrar descifrada
+                currentImageBase64 = data.decrypted;  // Solo para display
+                imagePreview.innerHTML = `<img src="${currentImageBase64}" style="max-height: 200px; margin-top: 1rem;">`;
+                imageInfo.textContent = '🔓 Imagen descifrada';
+                encryptedData = null;
+                downloadDataBtn.disabled = true;
+                
+            } else {
+                alert('Error: ' + data.error);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+        
+        hideLoading();
+    })
+    
+    // Download encrypted data
+    downloadDataBtn.addEventListener('click', () => {
+        if (!encryptedData) {
+            alert('No hay datos cifrados para descargar. Primero encripta una imagen.');
+            return;
+        }
+        
+        const dataToSave = {
+            ...encryptedData,
+            timestamp: new Date().toISOString(),
+            version: '1.0'
+        };
+        
+        const blob = new Blob([JSON.stringify(dataToSave)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `encrypted_image_${Date.now()}.enc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert('✅ Datos cifrados guardados. Usa este archivo para desencriptar después de recargar.');
+    });
+    
+    // Load encrypted data button
+    loadDataBtn.addEventListener('click', () => {
+        encDataInput.click();
+    });
+    
+    // Handle loading encrypted data file
+    encDataInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const loadedData = JSON.parse(event.target.result);
+                
+                // Verify it has the required fields
+                if (!loadedData.r_real || !loadedData.r_imag) {
+                    throw new Error('Archivo .enc inválido - faltan datos de canales R');
+                }
+                
+                encryptedData = loadedData;
+                
+                // Update parameters from loaded data
+                if (loadedData.alpha_r !== undefined) {
+                    alphaR.value = loadedData.alpha_r;
+                    alphaRValue.textContent = parseFloat(loadedData.alpha_r).toFixed(2);
+                }
+                if (loadedData.alpha_g !== undefined) {
+                    alphaG.value = loadedData.alpha_g;
+                    alphaGValue.textContent = parseFloat(loadedData.alpha_g).toFixed(2);
+                }
+                if (loadedData.alpha_b !== undefined) {
+                    alphaB.value = loadedData.alpha_b;
+                    alphaBValue.textContent = parseFloat(loadedData.alpha_b).toFixed(2);
+                }
+                if (loadedData.arnold_a !== undefined) {
+                    arnoldA.value = loadedData.arnold_a;
+                    arnoldAValue.textContent = loadedData.arnold_a;
+                }
+                if (loadedData.arnold_k !== undefined) {
+                    arnoldK.value = loadedData.arnold_k;
+                    arnoldKValue.textContent = loadedData.arnold_k;
+                }
+                if (loadedData.compression !== undefined) {
+                    compressionSlider.value = loadedData.compression;
+                    compressionValueDisplay.textContent = loadedData.compression + '%';
+                }
+                
+                // Enable decrypt button
+                decryptBtn.disabled = false;
+                downloadDataBtn.disabled = false;
+                
+                // Update info
+                const rows = loadedData.r_real.length;
+                const cols = loadedData.r_real[0].length;
+                imageInfo.textContent = `Datos cifrados cargados: ${cols} × ${rows} pixels`;
+                
+                // Generar imagen de visualización a partir de los datos complejos
+                try {
+                    const encryptedImageBase64 = generateEncryptedImagePreview(loadedData);
+                    currentImageBase64 = encryptedImageBase64;
+                    imagePreview.innerHTML = `
+                        <div style="text-align: center; margin-top: 1rem;">
+                            <img src="${encryptedImageBase64}" style="max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <p style="margin: 0.5rem 0 0 0; color: #166534;"><strong>🔐 Imagen cifrada cargada</strong></p>
+                            <small style="color: #15803d;">Ahora puedes desencriptar con los parámetros guardados</small>
+                        </div>`;
+                } catch (imgErr) {
+                    console.warn('No se pudo generar preview:', imgErr);
+                    imagePreview.innerHTML = `<div style="padding: 2rem; text-align: center; background: #dcfce7; border-radius: 8px; margin-top: 1rem;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; color: #22c55e;"></i>
+                        <p style="margin: 0.5rem 0 0 0; color: #166534;"><strong>Datos cifrados cargados correctamente</strong></p>
+                        <small style="color: #15803d;">Ahora puedes desencriptar con los parámetros guardados</small>
+                    </div>`;
+                }
+                
+                alert('✅ Datos cifrados cargados. Puedes desencriptar ahora.');
+                
+            } catch (error) {
+                alert('❌ Error al cargar archivo: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+        
+        // Reset input so same file can be loaded again
+        e.target.value = '';
+    });
+    
+    function showImage(imgId, placeholderId, src) {
+        const img = document.getElementById(imgId);
+        const placeholder = document.getElementById(placeholderId);
+        if (src) {
+            img.src = src;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+    }
+    
+    // Genera una imagen de visualización a partir de datos complejos cifrados
+    function generateEncryptedImagePreview(data) {
+        const rows = data.r_real.length;
+        const cols = data.r_real[0].length;
+        
+        // Calcular magnitud para cada canal
+        function computeMagnitude(real, imag) {
+            const mag = [];
+            let minVal = Infinity, maxVal = -Infinity;
+            for (let i = 0; i < real.length; i++) {
+                mag[i] = [];
+                for (let j = 0; j < real[i].length; j++) {
+                    const r = real[i][j];
+                    const im = imag[i][j];
+                    const m = Math.sqrt(r * r + im * im);
+                    mag[i][j] = m;
+                    if (m < minVal) minVal = m;
+                    if (m > maxVal) maxVal = m;
+                }
+            }
+            return { mag, minVal, maxVal };
+        }
+        
+        // Normalizar a [0, 255]
+        function normalize(magData) {
+            const { mag, minVal, maxVal } = magData;
+            const range = maxVal - minVal || 1;
+            const norm = [];
+            for (let i = 0; i < mag.length; i++) {
+                norm[i] = [];
+                for (let j = 0; j < mag[i].length; j++) {
+                    norm[i][j] = Math.round(((mag[i][j] - minVal) / range) * 255);
+                }
+            }
+            return norm;
+        }
+        
+        const rMag = computeMagnitude(data.r_real, data.r_imag);
+        const gMag = computeMagnitude(data.g_real, data.g_imag);
+        const bMag = computeMagnitude(data.b_real, data.b_imag);
+        
+        const rNorm = normalize(rMag);
+        const gNorm = normalize(gMag);
+        const bNorm = normalize(bMag);
+        
+        // Crear canvas y dibujar
+        const canvas = document.createElement('canvas');
+        canvas.width = cols;
+        canvas.height = rows;
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.createImageData(cols, rows);
+        
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const idx = (y * cols + x) * 4;
+                imageData.data[idx] = rNorm[y][x];     // R
+                imageData.data[idx + 1] = gNorm[y][x]; // G
+                imageData.data[idx + 2] = bNorm[y][x]; // B
+                imageData.data[idx + 3] = 255;         // A
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        return canvas.toDataURL('image/png');
+    }
+    
+    function showLoading(text) {
+        loadingText.textContent = text;
+        loadingOverlay.style.display = 'flex';
+    }
+    
+    function hideLoading() {
+        loadingOverlay.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

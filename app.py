@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
 """
 Aplicación Flask para reconocimiento de comandos por análisis FFT.
 Interfaz web para las funcionalidades de reconocimiento en tiempo real
 y análisis de modelos.
 """
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import os
 import json
@@ -13,6 +17,7 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import soundfile as sf
 from scipy.io import wavfile
+from PIL import Image
 
 # Intentar importar pydub (opcional)
 try:
@@ -30,14 +35,79 @@ from processing.audio_utils import normalize_audio, pad_or_trim, read_wav, list_
 from processing.fft_utils import analyze_signal
 from recognition.recognizer import load_models, compare_with_models
 from recognition.model import Model
+from datetime import datetime
+
+# ============ AUDIO LOG SYSTEM (Últimos 5 audios) ============
+AUDIO_LOG_DIR = os.path.join(DATA_DIR, 'audio_logs')
+os.makedirs(AUDIO_LOG_DIR, exist_ok=True)
+MAX_AUDIO_LOGS = 5
+
+def save_audio_log(audio_bytes):
+    """Guarda los últimos 5 audios de 1 segundo en audio_logs/"""
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]  # YYYYMMDD_HHMMSS_ms
+        filename = f'audio_{timestamp}.wav'
+        filepath = os.path.join(AUDIO_LOG_DIR, filename)
+        
+        # Guardar el audio
+        with open(filepath, 'wb') as f:
+            f.write(audio_bytes)
+        
+        # Limpiar audios antiguos, mantener solo los últimos 5
+        audio_files = sorted([f for f in os.listdir(AUDIO_LOG_DIR) if f.startswith('audio_') and f.endswith('.wav')])
+        if len(audio_files) > MAX_AUDIO_LOGS:
+            for old_file in audio_files[:-MAX_AUDIO_LOGS]:
+                try:
+                    os.remove(os.path.join(AUDIO_LOG_DIR, old_file))
+                    print(f"🗑️ Audio log eliminado: {old_file}")
+                except Exception as e:
+                    print(f"⚠️ Error eliminando {old_file}: {e}")
+        
+        print(f"💾 Audio guardado: {filename}")
+        return True
+    except Exception as e:
+        print(f"❌ Error guardando audio log: {e}")
+        return False
 
 # Configuración de la aplicación
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB máximo
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB máximo para soportar imágenes grandes
 app.config['UPLOAD_FOLDER'] = os.path.join(DATA_DIR, 'uploads')
+
+# Manejador de error para Request Entity Too Large
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Maneja errores de payload demasiado grande"""
+    return jsonify({
+        'success': False,
+        'error': 'El archivo es demasiado grande (máximo 200MB). Intenta con una imagen más pequeña.'
+    }), 413
 
 # Crear carpeta de uploads si no existe
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Middleware para cacheo de recursos estáticos (archivos locales)
+@app.after_request
+def add_cache_headers(response):
+    """Añade headers de cache para recursos estáticos"""
+    # Para APIs (/api/*), NO cachear
+    if request.path.startswith('/api/'):
+        response.cache_control.max_age = 0
+        response.cache_control.no_cache = True
+        response.cache_control.no_store = True
+        response.cache_control.must_revalidate = True
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    elif response.content_type and any(ext in response.content_type for ext in 
+                                     ['javascript', 'css', 'font', 'image']):
+        # Cache agresivo: 30 días para archivos estáticos
+        response.cache_control.max_age = 2592000
+        response.cache_control.public = True
+    elif response.status_code == 200:
+        # Para HTML: cache corto
+        response.cache_control.max_age = 3600
+        response.cache_control.public = True
+    return response
 
 # Cargar modelos al iniciar
 try:
@@ -51,6 +121,12 @@ except FileNotFoundError as e:
 def index():
     """Página principal con reconocimiento en tiempo real"""
     return render_template('index.html', fs=FS, target_n=TARGET_N)
+
+
+@app.route('/audio-logs')
+def audio_logs_page():
+    """Página para ver audios grabados"""
+    return render_template('audio_logs.html')
 
 
 @app.route('/models')
@@ -74,6 +150,9 @@ def recognize():
             # Archivo cargado como multipart/form-data
             audio_file = request.files['audio']
             audio_bytes = audio_file.read()
+            
+            # 💾 Guardar el audio en el log (últimos 5)
+            save_audio_log(audio_bytes)
             
             # Intentar decodificar con múltiples métodos
             try:
@@ -151,21 +230,46 @@ def recognize():
         # Asegurar tipo float32
         audio_data = audio_data.astype(np.float32)
 
+        # DEBUG: Ver audio ANTES de cualquier procesamiento
+        print(f"\n{'='*60}")
+        print(f"DEBUG AUDIO ORIGINAL (antes de normalizar/pad_trim)")
+        print(f"{'='*60}")
+        print(f"  Longitud: {len(audio_data)} muestras ({len(audio_data)/sr:.3f} s)")
+        print(f"  Sample rate recibido: {sr}")
+        print(f"  Max amplitud: {np.max(np.abs(audio_data)):.6f}")
+        # Ver energía en tercios del audio original
+        third = len(audio_data) // 3
+        e1 = np.sum(audio_data[:third]**2) / third if third > 0 else 0
+        e2 = np.sum(audio_data[third:2*third]**2) / third if third > 0 else 0
+        e3 = np.sum(audio_data[2*third:]**2) / (len(audio_data) - 2*third) if len(audio_data) > 2*third else 0
+        print(f"  Energía tercio 1 (0-{third/sr:.3f}s): {e1:.10f}")
+        print(f"  Energía tercio 2 ({third/sr:.3f}-{2*third/sr:.3f}s): {e2:.10f}")
+        print(f"  Energía tercio 3 ({2*third/sr:.3f}s-fin): {e3:.10f}")
+        print(f"{'='*60}\n")
+
         # Normalizar y preparar
         audio_data = normalize_audio(audio_data)
         audio_data = pad_or_trim(audio_data, TARGET_N)
 
-        # Analizar señal
-        freqs, spectrum, energies = analyze_signal(audio_data)
+        # Analizar señal (ahora solo retorna energías por subbandas temporales)
+        _, _, energies = analyze_signal(audio_data)
 
         # Comparar con modelos (usando métrica de config.py)
-        from config import DISTANCE_METRIC
-        best_cmd, diffs = compare_with_models(energies, models, distance_method=DISTANCE_METRIC)
+        from config import DISTANCE_METRIC, RECOGNITION_THRESHOLD
+        best_cmd, diffs, is_valid = compare_with_models(energies, models, distance_method=DISTANCE_METRIC)
 
         # DEBUG: Verificar energías normalizadas
         print(f"DEBUG: Sum of energies: {np.sum(energies)}")
-        print(f"DEBUG: First 3 energies: {energies[:3]}")
+        print(f"DEBUG: Energies: {energies}")
         print(f"DEBUG: Max energy: {np.max(energies)}")
+        print(f"DEBUG: is_valid: {is_valid}, threshold: {RECOGNITION_THRESHOLD}")
+
+        # Calcular FFT solo para visualización
+        from processing.fft_utils import compute_fft, magnitude_spectrum
+        
+        audio_for_fft = audio_data
+        spectrum, freqs = compute_fft(audio_for_fft)
+        spectrum_mag = magnitude_spectrum(spectrum)
 
         # Preparar gráficas
         plot_data = {
@@ -175,7 +279,7 @@ def recognize():
             },
             'spectrum': {
                 'x': freqs.tolist(),
-                'y': (20 * np.log10(np.abs(spectrum) + 1e-10)).tolist(),
+                'y': spectrum_mag.tolist(),
             },
             'energies': energies.tolist(),
             'models_comparison': {}
@@ -183,17 +287,38 @@ def recognize():
 
         # Comparaciones con modelos
         for model_name, model_obj in models.items():
+            # Sanitizar el valor de diferencia (convertir inf a un valor grande)
+            diff_value = diffs.get(model_name, 0.0)
+            if np.isinf(diff_value) or np.isnan(diff_value):
+                diff_value = 999999.0
+            
             plot_data['models_comparison'][model_name] = {
                 'model_energies': model_obj.mean_energy.tolist(),
                 'model_std': model_obj.std_energy.tolist(),
                 'input_energies': energies.tolist(),
-                'difference': diffs.get(model_name, 0.0)
+                'difference': float(diff_value)
             }
 
+        # Calcular la mejor diferencia para incluir en la respuesta
+        best_diff = min(diffs.values()) if diffs else 999999.0
+        if np.isinf(best_diff) or np.isnan(best_diff):
+            best_diff = 999999.0
+        
+        # Sanitizar todas las diferencias para JSON
+        sanitized_diffs = {}
+        for k, v in diffs.items():
+            if np.isinf(v) or np.isnan(v):
+                sanitized_diffs[k] = 999999.0
+            else:
+                sanitized_diffs[k] = float(v)
+        
         response = {
             'success': True,
             'recognized_command': best_cmd,
-            'differences': diffs,
+            'differences': sanitized_diffs,
+            'is_confident': is_valid,  # True si la distancia está por debajo del umbral
+            'threshold': RECOGNITION_THRESHOLD,
+            'best_distance': float(best_diff),
             'energy_total': float(np.sum(energies)),
             'plot_data': plot_data,
             'models': list(models.keys())
@@ -212,15 +337,25 @@ def recognize():
 def get_model_data(model_name):
     """
     Obtiene datos de un modelo específico para visualización.
+    Recarga los datos del JSON para evitar cache.
     """
     try:
-        if model_name not in models:
+        from recognition.model import Model
+        import json
+        import os
+        
+        model_file = os.path.join(MODELOS_DIR, f'{model_name}.json')
+        if not os.path.exists(model_file):
             return jsonify({'error': f'Modelo {model_name} no encontrado'}), 404
-
-        model = models[model_name]
+        
+        # Cargar modelo fresco desde JSON
+        with open(model_file, 'r') as f:
+            data = json.load(f)
+        
+        model = Model(data)
         n_bands = len(model.mean_energy)
 
-        data = {
+        response_data = {
             'model_name': model_name,
             'n_bands': n_bands,
             'num_samples': model.num_samples,
@@ -230,7 +365,7 @@ def get_model_data(model_name):
             'bands': [f'B{i+1}' for i in range(n_bands)]
         }
 
-        return jsonify(data)
+        return jsonify(response_data)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -311,6 +446,76 @@ def get_input_devices():
     try:
         devices = list_input_devices()
         return jsonify({'success': True, 'devices': devices})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/audio-logs', methods=['GET'])
+def get_audio_logs():
+    """API para obtener lista de audios guardados (últimos 5)"""
+    try:
+        audio_files = sorted([f for f in os.listdir(AUDIO_LOG_DIR) if f.startswith('audio_') and f.endswith('.wav')])
+        audio_files = audio_files[-MAX_AUDIO_LOGS:]  # Últimos 5
+        return jsonify({
+            'success': True,
+            'audio_logs': audio_files,
+            'count': len(audio_files)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/audio-logs/<filename>', methods=['GET'])
+def download_audio_log(filename):
+    """Descargar un audio del log"""
+    try:
+        # Validar que sea un archivo de audio válido
+        if not filename.startswith('audio_') or not filename.endswith('.wav'):
+            return jsonify({'success': False, 'error': 'Archivo inválido'}), 400
+        
+        filepath = os.path.join(AUDIO_LOG_DIR, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'success': False, 'error': 'Archivo no encontrado'}), 404
+        
+        from flask import send_file
+        return send_file(filepath, mimetype='audio/wav', download_name=filename, as_attachment=True)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/audio-logs/<filename>', methods=['DELETE'])
+def delete_audio_log(filename):
+    """Eliminar un audio del log"""
+    try:
+        # Validar que sea un archivo de audio válido
+        if not filename.startswith('audio_') or not filename.endswith('.wav'):
+            return jsonify({'success': False, 'error': 'Archivo inválido'}), 400
+        
+        filepath = os.path.join(AUDIO_LOG_DIR, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'success': False, 'error': 'Archivo no encontrado'}), 404
+        
+        os.remove(filepath)
+        print(f"🗑️ Audio eliminado: {filename}")
+        return jsonify({'success': True, 'message': 'Audio eliminado'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/audio-logs/delete-all', methods=['POST'])
+def delete_all_audio_logs():
+    """Eliminar todos los audios del log"""
+    try:
+        audio_files = [f for f in os.listdir(AUDIO_LOG_DIR) if f.startswith('audio_') and f.endswith('.wav')]
+        for filename in audio_files:
+            filepath = os.path.join(AUDIO_LOG_DIR, filename)
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"⚠️ Error eliminando {filename}: {e}")
+        
+        print(f"🗑️ Todos los audios fueron eliminados ({len(audio_files)} archivos)")
+        return jsonify({'success': True, 'message': f'{len(audio_files)} audios eliminados'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -575,6 +780,12 @@ def image_processing():
     return render_template('image_processing.html')
 
 
+@app.route('/encryption-interactive')
+def encryption_interactive():
+    """Página de encriptación interactiva con comandos de voz"""
+    return render_template('encryption_interactive.html')
+
+
 @app.route('/api/image/grayscale', methods=['POST'])
 def api_grayscale():
     """Convierte imagen a escala de grises"""
@@ -797,8 +1008,722 @@ def process_image():
         return jsonify({'success': False, 'error': f'Error procesando imagen: {str(e)}'}), 500
 
 
+@app.route('/frdct')
+def frdct_page():
+    """Página de cifrado de imágenes con FrDCT"""
+    return render_template('frdct.html')
+
+
+@app.route('/api/frdct/grayscale', methods=['POST'])
+def api_frdct_grayscale():
+    """Convierte imagen a escala de grises para FrDCT"""
+    try:
+        from PIL import Image
+        from processing.frdct import array_to_base64
+        
+        data = request.get_json()
+        image_base64 = data.get('image_base64')
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No hay imagen'}), 400
+        
+        # Decodificar base64
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        
+        # Convertir a escala de grises (mantener dimensiones originales)
+        gray_pil = pil_img.convert('L')
+        gray_array = np.array(gray_pil)
+        
+        # Convertir a base64
+        result_base64 = array_to_base64(gray_array, normalize=False)
+        
+        return jsonify({
+            'success': True,
+            'image': result_base64,
+            'width': gray_array.shape[1],
+            'height': gray_array.shape[0]
+        })
+    except Exception as e:
+        print(f"Error en frdct/grayscale: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/frdct/encrypt', methods=['POST'])
+def api_frdct_encrypt():
+    """Cifra una imagen usando FrDCT"""
+    try:
+        from processing.frdct import base64_to_array, encrypt_image, array_to_base64
+        
+        data = request.get_json()
+        image_base64 = data.get('image_base64')
+        alpha = float(data.get('alpha', 0.5))
+
+        # Validar rango de alpha (0 <= α < 2, ya que α=2 produce matriz singular)
+        if alpha < 0.0 or alpha >= 2.0:
+            return jsonify({'success': False, 'error': 'α debe estar en el rango [0, 2). α=2 produce una matriz singular no invertible.'}), 400
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No hay imagen'}), 400
+        
+        # Convertir base64 a array
+        gray_array = base64_to_array(image_base64)
+        
+        print(f"📐 Cifrando imagen {gray_array.shape} con α = {alpha}")
+        
+        # Aplicar FrDCT (cifrar)
+        encrypted = encrypt_image(gray_array, alpha, use_fast=True)
+        
+        # Convertir coeficientes a lista para JSON
+        encrypted_list = encrypted.tolist()
+        
+        # Crear visualización normalizada de los coeficientes (escala logarítmica)
+        encrypted_visual = array_to_base64(encrypted, normalize=True, use_log_scale=True)
+        
+        print(f"✅ Cifrado completado")
+        
+        return jsonify({
+            'success': True,
+            'encrypted_data': encrypted_list,
+            'encrypted_visual': encrypted_visual,
+            'alpha_used': alpha
+        })
+    except Exception as e:
+        print(f"Error en frdct/encrypt: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/frdct/decrypt', methods=['POST'])
+def api_frdct_decrypt():
+    """Descifra una imagen usando FrDCT inversa"""
+    try:
+        from processing.frdct import decrypt_image, array_to_base64
+        
+        data = request.get_json()
+        encrypted_data = data.get('encrypted_data')
+        alpha = float(data.get('alpha', 0.5))
+
+        # Validar rango de alpha (0 <= α < 2, ya que α=2 produce matriz singular)
+        if alpha < 0.0 or alpha >= 2.0:
+            return jsonify({'success': False, 'error': 'α debe estar en el rango [0, 2). α=2 produce una matriz singular no invertible.'}), 400
+        
+        if not encrypted_data:
+            return jsonify({'success': False, 'error': 'No hay datos cifrados'}), 400
+        
+        # Convertir lista a array numpy
+        encrypted_array = np.array(encrypted_data, dtype=np.float64)
+        
+        print(f"🔓 Descifrando imagen {encrypted_array.shape} con α = {alpha}")
+        
+        # Aplicar FrDCT inversa (descifrar)
+        decrypted = decrypt_image(encrypted_array, alpha, use_fast=True)
+        
+        # Clip a rango válido y convertir a uint8
+        decrypted_clipped = np.clip(decrypted, 0, 255)
+        
+        # Convertir a base64
+        decrypted_base64 = array_to_base64(decrypted_clipped, normalize=False)
+        
+        print(f"✅ Descifrado completado")
+        
+        return jsonify({
+            'success': True,
+            'decrypted_image': decrypted_base64,
+            'alpha_used': alpha
+        })
+    except Exception as e:
+        print(f"Error en frdct/decrypt: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== ENCRIPTACIÓN COMPLETA (FrDCT + DOST) ====================
+
+@app.route('/encryption')
+def encryption_page():
+    """Página de encriptación RGB con FrDCT + DOST"""
+    return render_template('encryption.html')
+
+
+@app.route('/api/encryption/crop', methods=['POST'])
+def api_encryption_crop():
+    """
+    Recorta una imagen a un cuadrado seleccionado por el usuario.
+    Recibe: image (base64), x, y, size (tamaño del cuadrado)
+    """
+    try:
+        from PIL import Image
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+        
+        image_base64 = data.get('image')
+        x = int(data.get('x', 0))
+        y = int(data.get('y', 0))
+        size = int(data.get('size', 0))
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No image data provided'}), 400
+        
+        if size <= 0:
+            return jsonify({'success': False, 'error': 'Size must be greater than 0'}), 400
+        
+        # Decodificar imagen
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        try:
+            img_bytes = base64.b64decode(image_base64)
+            pil_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Failed to decode image: {str(e)}'}), 400
+        
+        orig_width, orig_height = pil_img.size
+        
+        # Validar que el recorte esté dentro de los límites
+        if x < 0 or y < 0:
+            return jsonify({'success': False, 'error': 'Coordinates must be >= 0'}), 400
+        if x + size > orig_width or y + size > orig_height:
+            return jsonify({'success': False, 'error': f'Crop area exceeds image bounds. Image: {orig_width}x{orig_height}, Crop: ({x},{y}) + {size}'}), 400
+        
+        # Recortar imagen (PIL usa box = (left, upper, right, lower))
+        cropped = pil_img.crop((x, y, x + size, y + size))
+        
+        # Convertir a base64
+        buffer = io.BytesIO()
+        cropped.save(buffer, format='PNG')
+        buffer.seek(0)
+        cropped_base64 = 'data:image/png;base64,' + base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        print(f"✂️ Image cropped from {orig_width}x{orig_height} to {size}x{size} at ({x},{y})")
+        
+        return jsonify({
+            'success': True,
+            'cropped_image': cropped_base64,
+            'original_size': {'width': orig_width, 'height': orig_height},
+            'crop': {'x': x, 'y': y, 'size': size}
+        })
+        
+    except Exception as e:
+        print(f"Error in encryption/crop: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/encryption/encrypt', methods=['POST'])
+def api_encryption_encrypt():
+    """
+    Encripta una imagen RGB siguiendo el Algorithm 5:
+    Step-1: Split RGB into R, G, B planes
+    Step-2: Apply FrDCT with α1, α2, α3 to each plane
+    Step-3: Apply DOST to each FrDCT result
+    Step-4: Apply Arnold Transform with (a, k) for encryption
+    Step-5: Concatenate to obtain RGB encrypted image
+    """
+    try:
+        from processing.encryption import encrypt_image_rgb
+        from PIL import Image
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+            
+        image_base64 = data.get('image')
+        
+        # Obtener alphas para cada canal
+        alpha_r = float(data.get('alpha_r', data.get('alpha', 0.5)))
+        alpha_g = float(data.get('alpha_g', data.get('alpha', 0.5)))
+        alpha_b = float(data.get('alpha_b', data.get('alpha', 0.5)))
+        
+        # Obtener parámetros de Arnold Transform
+        arnold_a = int(data.get('arnold_a', 1))
+        arnold_k = int(data.get('arnold_k', 1))
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No image data provided'}), 400
+        
+        # Validar alphas
+        for alpha, name in [(alpha_r, 'α_R'), (alpha_g, 'α_G'), (alpha_b, 'α_B')]:
+            if alpha < 0.0 or alpha >= 2.0:
+                return jsonify({'success': False, 'error': f'{name} must be in range [0, 2)'}), 400
+        
+        # Decodificar imagen como RGB
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        try:
+            img_bytes = base64.b64decode(image_base64)
+            pil_img = Image.open(io.BytesIO(img_bytes))
+            rgb_array = np.array(pil_img.convert('RGB'), dtype=np.float64)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Failed to decode image: {str(e)}'}), 400
+        
+        # Auto-recortar si la imagen no es cuadrada (requerido por Arnold Transform)
+        height, width = rgb_array.shape[:2]
+        if height != width:
+            min_dim = min(height, width)
+            # Recortar desde el centro
+            start_y = (height - min_dim) // 2
+            start_x = (width - min_dim) // 2
+            rgb_array = rgb_array[start_y:start_y + min_dim, start_x:start_x + min_dim]
+            print(f"✂️ Auto-recortada de {width}×{height} a {min_dim}×{min_dim}")
+        
+        print(f"🔐 Encrypting RGB image {rgb_array.shape} with α_R={alpha_r}, α_G={alpha_g}, α_B={alpha_b}, Arnold(a={arnold_a}, k={arnold_k})")
+        
+        # Algorithm 5: FrDCT → DOST → Arnold
+        enc_result = encrypt_image_rgb(rgb_array, alpha_r, alpha_g, alpha_b, arnold_a, arnold_k)
+        
+        # Convertir a diccionario con imágenes base64
+        result_dict = enc_result.to_dict()
+        
+        # Guardar datos cifrados completos (para desencriptación perfecta)
+        encrypted_data = {
+            'r_real': np.real(enc_result.encrypted_r).tolist(),
+            'r_imag': np.imag(enc_result.encrypted_r).tolist(),
+            'g_real': np.real(enc_result.encrypted_g).tolist(),
+            'g_imag': np.imag(enc_result.encrypted_g).tolist(),
+            'b_real': np.real(enc_result.encrypted_b).tolist(),
+            'b_imag': np.imag(enc_result.encrypted_b).tolist(),
+            'alpha_r': float(alpha_r),
+            'alpha_g': float(alpha_g),
+            'alpha_b': float(alpha_b),
+            'arnold_a': int(arnold_a),
+            'arnold_k': int(arnold_k)
+        }
+        
+        print(f"✅ RGB Encryption completed successfully")
+        
+        return jsonify({
+            'success': True,
+            'original': result_dict['original'],
+            'after_frdct': result_dict['after_frdct'],
+            'after_dost': result_dict['after_dost'],
+            'encrypted': result_dict['encrypted'],
+            'encrypted_data': encrypted_data,
+            'params': {
+                'alpha_r': float(alpha_r),
+                'alpha_g': float(alpha_g),
+                'alpha_b': float(alpha_b),
+                'arnold_a': int(arnold_a),
+                'arnold_k': int(arnold_k)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error in encryption/encrypt: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/encryption/decrypt', methods=['POST'])
+def api_encryption_decrypt():
+    """
+    Desencripta una imagen RGB (Algorithm 6 - inverso del Algorithm 5):
+    Step-1: Split encrypted RGB into R, G, B planes
+    Step-2: Apply inverse Arnold Transform with same (a, k)
+    Step-3: Apply inverse DOST to each channel
+    Step-4: Apply inverse FrDCT with same α values
+    Step-5: Concatenate to obtain RGB decrypted image
+    """
+    try:
+        from processing.encryption import decrypt_image_rgb
+        from PIL import Image
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+            
+        encrypted_data = data.get('encrypted_data')
+        image_base64 = data.get('image')
+        
+        # Obtener alphas
+        alpha_r = float(data.get('alpha_r', data.get('alpha', 0.5)))
+        alpha_g = float(data.get('alpha_g', data.get('alpha', 0.5)))
+        alpha_b = float(data.get('alpha_b', data.get('alpha', 0.5)))
+        
+        # Obtener parámetros de Arnold Transform
+        arnold_a = int(data.get('arnold_a', 1))
+        arnold_k = int(data.get('arnold_k', 1))
+        
+        encrypted_r = None
+        encrypted_g = None
+        encrypted_b = None
+        
+        # Si tenemos datos cifrados completos RGB (de una encriptación previa)
+        if encrypted_data and isinstance(encrypted_data, dict):
+            if 'r_real' in encrypted_data:
+                try:
+                    encrypted_r = np.array(encrypted_data['r_real']) + 1j * np.array(encrypted_data['r_imag'])
+                    encrypted_g = np.array(encrypted_data['g_real']) + 1j * np.array(encrypted_data['g_imag'])
+                    encrypted_b = np.array(encrypted_data['b_real']) + 1j * np.array(encrypted_data['b_imag'])
+                    
+                    # NO sobrescribir los parámetros del request con los del archivo .enc
+                    # El usuario puede modificar los parámetros en la UI y queremos respetarlos
+                    # Los parámetros alpha_r, alpha_g, alpha_b, arnold_a, arnold_k 
+                    # ya fueron obtenidos del request arriba
+                except Exception as e:
+                    print(f"Warning: Could not parse RGB encrypted_data: {e}")
+        
+        # Si solo tenemos una imagen (sin datos complejos)
+        if encrypted_r is None and image_base64:
+            try:
+                if ',' in image_base64:
+                    image_base64 = image_base64.split(',')[1]
+                
+                img_bytes = base64.b64decode(image_base64)
+                pil_img = Image.open(io.BytesIO(img_bytes))
+                rgb_array = np.array(pil_img.convert('RGB'), dtype=np.float64)
+                
+                # Tratar cada canal como datos complejos (solo magnitud)
+                encrypted_r = rgb_array[:, :, 0].astype(np.complex128)
+                encrypted_g = rgb_array[:, :, 1].astype(np.complex128)
+                encrypted_b = rgb_array[:, :, 2].astype(np.complex128)
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Failed to decode image: {str(e)}'}), 400
+        
+        if encrypted_r is None:
+            return jsonify({'success': False, 'error': 'No encrypted data or image provided'}), 400
+        
+        print(f"🔓 Decrypting RGB image with α_R={alpha_r}, α_G={alpha_g}, α_B={alpha_b}, Arnold(a={arnold_a}, k={arnold_k})")
+        
+        # Algorithm 6 (inverse): Arnold⁻¹ → IDOST → IFrDCT
+        dec_result = decrypt_image_rgb(encrypted_r, encrypted_g, encrypted_b, alpha_r, alpha_g, alpha_b, arnold_a, arnold_k)
+        
+        # Convertir a diccionario con imágenes base64
+        result_dict = dec_result.to_dict()
+        
+        print(f"✅ RGB Decryption completed successfully")
+        
+        return jsonify({
+            'success': True,
+            'encrypted': result_dict['encrypted'],
+            'after_arnold_inv': result_dict['after_arnold_inv'],
+            'after_idost': result_dict['after_idost'],
+            'after_ifrdct': result_dict['after_ifrdct'],
+            'decrypted': result_dict['decrypted'],
+            'params': {
+                'alpha_r': float(alpha_r),
+                'alpha_g': float(alpha_g),
+                'alpha_b': float(alpha_b),
+                'arnold_a': int(arnold_a),
+                'arnold_k': int(arnold_k)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error in encryption/decrypt: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/encryption/compress', methods=['POST'])
+def api_encryption_compress():
+    """
+    Comprime una imagen usando DCT-2D a múltiples niveles (30%, 50%, 80%).
+    Retorna la imagen original y las versiones comprimidas.
+    """
+    try:
+        from processing.encryption import comprimir_imagen_multiples_niveles
+        from PIL import Image
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+            
+        image_base64 = data.get('image')
+        
+        if not image_base64:
+            return jsonify({'success': False, 'error': 'No image data provided'}), 400
+        
+        # Decodificar imagen
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        try:
+            img_bytes = base64.b64decode(image_base64)
+            pil_img = Image.open(io.BytesIO(img_bytes))
+            rgb_array = np.array(pil_img.convert('RGB'), dtype=np.uint8)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Failed to decode image: {str(e)}'}), 400
+        
+        print(f"📦 Compressing image {rgb_array.shape} at 30%, 50%, 80%")
+        
+        # Comprimir a múltiples niveles
+        result = comprimir_imagen_multiples_niveles(rgb_array)
+        
+        print(f"✅ Compression completed successfully")
+        
+        return jsonify({
+            'success': True,
+            'original': result['original'],
+            'compressed_30': result['compressed_30'],
+            'compressed_50': result['compressed_50'],
+            'compressed_80': result['compressed_80']
+        })
+        
+    except Exception as e:
+        print(f"Error in compression: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# YOLOv8 OBJECT DETECTION/SEGMENTATION
+# ============================================================================
+
+# Cargar modelo YOLOv8 (lazy loading)
+yolo_model = None
+yolo_seg_model = None
+
+def get_yolo_model():
+    """Carga el modelo YOLOv8 de detección (lazy loading)"""
+    global yolo_model
+    if yolo_model is None:
+        try:
+            from ultralytics import YOLO
+            # Usar modelo large para mejor precisión (yolov8l.pt)
+            yolo_model = YOLO('yolov8l.pt')
+            print("✅ YOLOv8 detection model loaded (large)")
+        except Exception as e:
+            print(f"⚠️ Error loading YOLOv8: {e}")
+            return None
+    return yolo_model
+
+def get_yolo_seg_model():
+    """Carga el modelo YOLOv8 de segmentación (lazy loading)"""
+    global yolo_seg_model
+    if yolo_seg_model is None:
+        try:
+            from ultralytics import YOLO
+            # Usar modelo large de segmentación para mejor precisión
+            yolo_seg_model = YOLO('yolov8l-seg.pt')
+            print("✅ YOLOv8 segmentation model loaded (large)")
+        except Exception as e:
+            print(f"⚠️ Error loading YOLOv8-seg: {e}")
+            return None
+    return yolo_seg_model
+
+@app.route('/api/yolo/detect', methods=['POST'])
+def yolo_detect():
+    """
+    Detecta objetos en una imagen usando YOLOv8.
+    Retorna bounding boxes, máscaras y clases detectadas.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({'success': False, 'error': 'No image provided'}), 400
+        
+        image_base64 = data['image']
+        mode = data.get('mode', 'box')  # 'box' o 'mask'
+        confidence = data.get('confidence', 0.25)
+        
+        # Decodificar imagen
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        img_array = np.array(pil_img)
+        
+        # Elegir modelo según modo
+        if mode == 'mask':
+            model = get_yolo_seg_model()
+        else:
+            model = get_yolo_model()
+        
+        if model is None:
+            return jsonify({'success': False, 'error': 'YOLOv8 model not available'}), 500
+        
+        # Ejecutar inferencia
+        results = model(img_array, conf=confidence, verbose=False)[0]
+        
+        detections = []
+        masks_data = []
+        
+        # Procesar resultados
+        if results.boxes is not None:
+            boxes = results.boxes
+            for i, box in enumerate(boxes):
+                cls_id = int(box.cls[0])
+                cls_name = model.names[cls_id]
+                conf = float(box.conf[0])
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                
+                detection = {
+                    'id': i,
+                    'class': cls_name,
+                    'class_id': cls_id,
+                    'confidence': round(conf, 3),
+                    'box': {
+                        'x1': int(x1),
+                        'y1': int(y1),
+                        'x2': int(x2),
+                        'y2': int(y2),
+                        'width': int(x2 - x1),
+                        'height': int(y2 - y1)
+                    }
+                }
+                
+                # Agregar máscara si está disponible
+                if mode == 'mask' and results.masks is not None and i < len(results.masks):
+                    mask = results.masks[i].data[0].cpu().numpy()
+                    # Redimensionar máscara al tamaño de la imagen
+                    import cv2
+                    mask_resized = cv2.resize(mask, (pil_img.width, pil_img.height))
+                    mask_binary = (mask_resized > 0.5).astype(np.uint8) * 255
+                    
+                    # Convertir máscara a base64 PNG
+                    mask_img = Image.fromarray(mask_binary, mode='L')
+                    mask_buffer = io.BytesIO()
+                    mask_img.save(mask_buffer, format='PNG')
+                    mask_base64 = base64.b64encode(mask_buffer.getvalue()).decode('utf-8')
+                    detection['mask'] = f"data:image/png;base64,{mask_base64}"
+                
+                detections.append(detection)
+        
+        # Generar imagen con anotaciones
+        annotated_img = results.plot()
+        annotated_pil = Image.fromarray(annotated_img)
+        
+        # Convertir a base64
+        buffer = io.BytesIO()
+        annotated_pil.save(buffer, format='PNG')
+        annotated_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'detections': detections,
+            'count': len(detections),
+            'annotated_image': f"data:image/png;base64,{annotated_base64}",
+            'original_image': data['image'],  # Devolver imagen original para re-renderizar
+            'image_size': {'width': pil_img.width, 'height': pil_img.height}
+        })
+        
+    except Exception as e:
+        print(f"Error in YOLO detection: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/yolo/render', methods=['POST'])
+def yolo_render():
+    """
+    Re-renderiza la imagen con solo las detecciones visibles (toggle visibility).
+    """
+    try:
+        import cv2
+        
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({'success': False, 'error': 'No image provided'}), 400
+        
+        image_base64 = data['image']
+        detections = data.get('detections', [])
+        visible_ids = data.get('visible_ids', [])  # IDs de detecciones visibles
+        mode = data.get('mode', 'box')  # 'box' o 'mask'
+        
+        # Decodificar imagen
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        img_bytes = base64.b64decode(image_base64)
+        pil_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        img_array = np.array(pil_img).copy()
+        
+        # Colores para cada clase (generados por hash del nombre)
+        def get_color(class_name):
+            import hashlib
+            hash_val = int(hashlib.md5(class_name.encode()).hexdigest()[:6], 16)
+            return ((hash_val >> 16) & 255, (hash_val >> 8) & 255, hash_val & 255)
+        
+        # Dibujar solo las detecciones visibles
+        for det in detections:
+            if det['id'] not in visible_ids:
+                continue
+            
+            color = get_color(det['class'])
+            box = det['box']
+            x1, y1, x2, y2 = box['x1'], box['y1'], box['x2'], box['y2']
+            
+            if mode == 'mask' and 'mask' in det:
+                # Dibujar máscara semitransparente
+                mask_base64 = det['mask']
+                if ',' in mask_base64:
+                    mask_base64 = mask_base64.split(',')[1]
+                
+                mask_bytes = base64.b64decode(mask_base64)
+                mask_img = Image.open(io.BytesIO(mask_bytes)).convert('L')
+                mask_array = np.array(mask_img)
+                
+                # Crear overlay coloreado
+                mask_bool = mask_array > 127
+                # Aplicar color solo donde la máscara es True
+                for c in range(3):
+                    img_array[:, :, c] = np.where(
+                        mask_bool,
+                        (img_array[:, :, c] * 0.5 + color[c] * 0.5).astype(np.uint8),
+                        img_array[:, :, c]
+                    )
+                
+                # Dibujar contorno de la máscara
+                contours, _ = cv2.findContours(mask_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img_array, contours, -1, color, 2)
+            else:
+                # Dibujar bounding box
+                cv2.rectangle(img_array, (x1, y1), (x2, y2), color, 2)
+            
+            # Dibujar etiqueta
+            label = f"{det['class']} {det['confidence']:.0%}"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.5
+            thickness = 1
+            (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+            
+            # Fondo de la etiqueta
+            cv2.rectangle(img_array, (x1, y1 - text_height - 10), (x1 + text_width + 4, y1), color, -1)
+            cv2.putText(img_array, label, (x1 + 2, y1 - 5), font, font_scale, (255, 255, 255), thickness)
+        
+        # Convertir a base64
+        result_img = Image.fromarray(img_array)
+        buffer = io.BytesIO()
+        result_img.save(buffer, format='PNG')
+        result_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'rendered_image': f"data:image/png;base64,{result_base64}"
+        })
+        
+    except Exception as e:
+        print(f"Error in YOLO render: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print(f"🎤 Aplicación iniciada. Modelos cargados: {list(models.keys())}")
     print(f"📊 Parámetros: FS={FS} Hz, TARGET_N={TARGET_N}")
     print("🌐 Abre http://localhost:5000 en tu navegador")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("📱 El proyecto está configurado para funcionar SIN internet")
+    
+    # Configurar timeout para requests grandes
+    from werkzeug.serving import WSGIRequestHandler
+    WSGIRequestHandler.protocol_version = "HTTP/1.1"
+    
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

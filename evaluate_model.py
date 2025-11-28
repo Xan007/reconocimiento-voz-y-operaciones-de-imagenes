@@ -124,8 +124,8 @@ def evaluate_model(distance_method='euclidean'):
                 # Calcular energía
                 _, _, energies = analyze_signal(x)
                 
-                # Comparar con modelos
-                prediccion, diffs = compare_with_models(energies, models, distance_method=distance_method)
+                # Comparar con modelos (retorna best_cmd, diffs, is_valid)
+                prediccion, diffs, _ = compare_with_models(energies, models, distance_method=distance_method)
                 
                 # Verificar si fue correcto
                 correcto = (prediccion == comando_real)

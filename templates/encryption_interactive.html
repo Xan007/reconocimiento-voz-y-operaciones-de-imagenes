@@ -1,0 +1,4288 @@
+{% extends 'base.html' %}
+
+{% block title %}Encriptación Interactiva - FrDCT + DOST + Arnold{% endblock %}
+
+{% block content %}
+<script src="{{ url_for('static', filename='js/audio-config.js') }}"></script>
+
+<style>
+/* AUDIO MODAL - COMPACTO */
+.audio-modal {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid #0066cc;
+}
+
+.audio-modal.hidden {
+    display: none !important;
+}
+
+.audio-modal-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.audio-modal-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: #0066cc;
+    flex: 1;
+}
+
+.dropdown-toggle {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #0066cc;
+    transition: transform 0.3s ease;
+}
+
+.dropdown-toggle:hover {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu-voice {
+    width: 100%;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.dropdown-item-voice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #0066cc;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item-voice:hover {
+    background: white;
+    box-shadow: 0 2px 6px rgba(0, 102, 204, 0.1);
+}
+
+.dropdown-item-voice input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #0066cc;
+}
+
+.recording-button {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 3px solid #0066cc;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
+}
+
+.recording-button:hover:not(.recording) {
+    background: #f0f7ff;
+    transform: scale(1.05);
+}
+
+.recording-button.recording {
+    background: #ff3333;
+    border-color: #ff3333;
+    animation: pulse-recording 0.8s infinite;
+}
+
+@keyframes pulse-recording {
+    0% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0.7); }
+    50% { box-shadow: 0 0 0 15px rgba(255, 51, 51, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 51, 51, 0); }
+}
+
+.recording-timer {
+    font-weight: bold;
+    color: #ff3333;
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.audio-status {
+    font-size: 12px;
+    color: #555;
+    text-align: center;
+    min-height: 16px;
+    font-weight: 500;
+}
+
+/* AUDIO LEVEL INDICATOR */
+.audio-level-container {
+    width: 100%;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.audio-level-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e 0%, #f59e0b 70%, #ef4444 100%);
+    transition: width 0.05s ease-out;
+    border-radius: 3px;
+}
+
+.recording-button.listening {
+    background: #22c55e;
+    border-color: #22c55e;
+    animation: pulse-listening 1.5s infinite;
+}
+
+@keyframes pulse-listening {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* RGB LAYERS GRID */
+.rgb-layers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.rgb-layer-group {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 0.8rem;
+}
+
+.rgb-layer-group h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.rgb-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.rgb-step {
+    text-align: center;
+}
+
+.rgb-step small {
+    display: block;
+    color: #666;
+    font-size: 0.75rem;
+    margin-bottom: 0.2rem;
+}
+
+.rgb-step img {
+    max-width: 100%;
+    max-height: 80px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+/* VAD INDICATOR */
+.vad-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.vad-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ccc;
+    transition: background 0.1s;
+}
+
+.vad-dot.speaking {
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+}
+
+/* COMPRESSION COMPARISON GRID */
+.compression-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.compression-item {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.compression-item:hover {
+    border-color: #0066cc;
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+}
+
+.compression-item h3 {
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.compression-item img {
+    max-width: 100%;
+    max-height: 180px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    background: white;
+}
+
+.comp-info {
+    margin: 10px 0 0 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.dec-psnr {
+    font-weight: bold;
+    color: #0066cc;
+}
+
+@media (max-width: 900px) {
+    .compression-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .compression-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .rgb-layers-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .rgb-steps {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .rgb-step img {
+        max-height: 60px;
+    }
+}
+
+/* VOICE COMMAND INDICATOR */
+.voice-command-panel {
+    background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%);
+    border: 2px solid var(--primary);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.voice-command-panel h4 {
+    color: var(--primary);
+    margin: 0 0 0.8rem 0;
+    font-size: 1rem;
+}
+
+.voice-options-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.voice-option {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.voice-option:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.voice-option.selected {
+    border-color: var(--primary);
+    background: rgba(0, 102, 204, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.2);
+}
+
+.voice-option .cmd {
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.voice-option .desc {
+    color: #333;
+    font-size: 0.9rem;
+}
+
+/* CROP & LOAD BUTTONS */
+.btn-crop {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 0.5rem;
+}
+
+.btn-crop:hover {
+    background: #004499;
+}
+
+.btn-load-enc {
+    background: #f59e0b;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-load-enc:hover {
+    background: #d97706;
+}
+
+/* CROP MODAL */
+.crop-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+.crop-modal.show {
+    display: flex;
+}
+
+.crop-modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 800px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.crop-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: linear-gradient(135deg, var(--primary) 0%, #004499 100%);
+    border-radius: 12px 12px 0 0;
+}
+
+.crop-modal-header h2 {
+    color: white;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.crop-close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.crop-info-box {
+    background: #fff7ed;
+    border-left: 4px solid #f59e0b;
+    padding: 1rem;
+    margin: 1rem;
+    border-radius: 4px;
+}
+
+.crop-info-box p {
+    margin: 0.3rem 0;
+}
+
+.crop-canvas-container {
+    text-align: center;
+    padding: 1rem;
+    background: #f0f0f0;
+    margin: 0 1rem;
+    border-radius: 8px;
+}
+
+.crop-canvas-container canvas {
+    max-width: 100%;
+    cursor: crosshair;
+    border: 2px solid #ccc;
+}
+
+.crop-presets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0 1rem;
+}
+
+.crop-preset-btn {
+    background: #e5e7eb;
+    border: 2px solid transparent;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.crop-preset-btn:hover {
+    border-color: var(--primary);
+}
+
+.crop-preset-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.crop-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.crop-control-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.crop-control-item label {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.crop-control-item input {
+    padding: 0.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.crop-modal-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.crop-modal-footer .btn {
+    padding: 0.7rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-cancel-crop {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-apply-crop {
+    background: var(--success);
+    color: white;
+}
+
+:root {
+    --primary: #0066cc;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --gray: #666;
+}
+
+.encryption-wrapper {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 2rem 1rem;
+}
+
+.processor-section {
+    animation: fadeIn 0.3s ease;
+    display: none;
+}
+
+.processor-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.processor-card {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+    border-top: 4px solid var(--primary);
+}
+
+.processor-card h2 {
+    color: var(--primary);
+    margin: 0 0 0.5rem 0;
+    font-size: 1.4rem;
+}
+
+.processor-card p {
+    color: var(--gray);
+    margin: 0 0 1.5rem 0;
+}
+
+/* UPLOAD AREA */
+.upload-area {
+    border: 3px dashed var(--primary);
+    border-radius: 8px;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.upload-area:hover {
+    background: rgba(0, 102, 204, 0.05);
+    border-color: #004499;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.upload-placeholder p {
+    margin: 0.5rem 0;
+    font-weight: 600;
+}
+
+.upload-placeholder small {
+    color: var(--gray);
+}
+
+/* IMAGE DISPLAY */
+.image-display {
+    margin: 1.5rem 0;
+    text-align: center;
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-display img {
+    max-width: 100%;
+    max-height: 350px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: block;
+}
+
+.image-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.image-info p {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+/* VOICE OPTIONS */
+.voice-options {
+    background: linear-gradient(135deg, #e8eef7 0%, #f0f5ff 100%);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+    margin-top: 1.5rem;
+}
+
+.voice-instruction {
+    color: #0066cc;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0 0 1rem 0;
+    padding: 10px 12px;
+    background: rgba(0, 102, 204, 0.08);
+    border-left: 3px solid #0066cc;
+    border-radius: 4px;
+}
+
+.voice-options h3 {
+    color: var(--primary);
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+}
+
+.option-item {
+    display: grid;
+    grid-template-columns: 1fr 60px;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 1.2rem;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 2px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.option-item:hover {
+    border-color: #0066cc;
+    box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    transform: translateX(4px);
+}
+
+.option-item.selected {
+    background: white;
+    border-color: #003d99;
+    border-width: 3px;
+    box-shadow: 0 4px 12px rgba(0, 61, 153, 0.3);
+    transform: translateX(4px);
+}
+
+.option-item.selected .option-text {
+    color: #003d99;
+    font-weight: 600;
+}
+
+.option-item:last-of-type {
+    margin-bottom: 0;
+}
+
+.option-text {
+    color: #333;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.option-text strong {
+    color: var(--primary);
+}
+
+.status {
+    font-size: 2rem;
+    text-align: center;
+    min-width: 50px;
+    color: #0066cc;
+}
+
+/* PARAMETER SECTION */
+.param-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.param-section h4 {
+    color: var(--primary);
+    margin: 0 0 1rem 0;
+}
+
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+}
+
+.param-row label {
+    min-width: 120px;
+    font-weight: 600;
+    color: #333;
+}
+
+.param-row input[type="range"] {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: #e0e0e0;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.param-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+}
+
+.param-value {
+    min-width: 60px;
+    text-align: center;
+    font-weight: bold;
+    color: var(--primary);
+    background: rgba(0, 102, 204, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* MODAL */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #004499 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px 12px 0 0;
+}
+
+.modal-header h2 {
+    color: white;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.2rem;
+}
+
+.modal-header p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    border-radius: 0 0 12px 12px;
+    text-align: center;
+}
+
+.modal-hint {
+    margin: 0;
+    color: var(--gray);
+    font-size: 0.9rem;
+}
+
+.modal-hint strong {
+    color: var(--primary);
+}
+
+/* PROCESS STEPS - Estilo mejorado */
+.process-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.2rem;
+    margin: 1.5rem 0;
+}
+
+.step-item {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    border: 2px solid #e0e7ff;
+    transition: all 0.3s ease;
+}
+
+.step-item:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-title {
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+}
+
+.step-description {
+    color: var(--gray);
+    font-size: 0.8rem;
+    margin-bottom: 0.6rem;
+}
+
+.step-item h4 {
+    color: var(--primary);
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.step-item img {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    background: white;
+}
+
+.step-placeholder {
+    width: 100%;
+    height: 120px;
+    background: #e5e7eb;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray);
+    font-size: 0.8rem;
+}
+
+/* COMPARISON */
+.comparison-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin: 1.5rem 0;
+}
+
+.comparison-item {
+    text-align: center;
+}
+
+.comparison-item h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.comparison-item img {
+    max-width: 100%;
+    max-height: 250px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* BUTTONS */
+.btn-download {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-download:hover {
+    background: #16a34a;
+    transform: translateY(-2px);
+}
+
+/* CONFIRMATION MODAL */
+.confirmation-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    min-width: 350px;
+    display: none;
+    flex-direction: column;
+}
+
+.confirmation-modal.show {
+    display: flex;
+}
+
+.confirmation-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+}
+
+.confirmation-modal-overlay.show {
+    display: block;
+}
+
+.confirmation-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.confirmation-header h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.confirmation-body {
+    padding: 1.5rem;
+    text-align: center;
+    color: #333;
+}
+
+.confirmation-footer {
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    border-top: 1px solid #e0e0e0;
+}
+
+.button-group {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+}
+
+.button-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.button-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #0066cc;
+}
+
+.btn-confirm {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-confirm.highlight {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+    transform: scale(1.05);
+}
+
+.btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+    border: 2px solid #e0e0e0;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-cancel.highlight {
+    background: #999;
+    color: white;
+    transform: scale(1.05);
+}
+
+.confirmation-hint {
+    font-size: 0.8rem;
+    color: #999;
+    padding: 0.5rem 1.5rem 1rem;
+    text-align: center;
+    font-style: italic;
+}
+
+/* STATUS */
+.status-message {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+
+.status-message.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border-left: 4px solid var(--danger);
+}
+
+.status-message.success {
+    background: #f0fdf4;
+    color: #166534;
+    border-left: 4px solid var(--success);
+}
+
+/* LOADING */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    flex-direction: column;
+}
+
+.loading-overlay.show {
+    display: flex;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #e0e0e0;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    margin-top: 1rem;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .comparison-container {
+        grid-template-columns: 1fr;
+    }
+    .process-steps {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Segmentation Section Styles */
+.segmentation-card {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.segmentation-container {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.segmentation-image-wrapper {
+    flex: 2;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+}
+
+.segmentation-image-wrapper img {
+    max-width: 100%;
+    max-height: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.segmentation-controls {
+    flex: 1;
+    min-width: 250px;
+}
+
+.mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border: 2px solid #f59e0b;
+    background: white;
+    color: #b45309;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.mode-btn:hover {
+    background: #fffbeb;
+}
+
+.mode-btn.active {
+    background: #f59e0b;
+    color: white;
+}
+
+.detections-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.detections-header h4 {
+    color: #92400e;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.toggle-all-btns {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.toggle-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: #e5e7eb;
+    color: #374151;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    background: #d1d5db;
+}
+
+.detections-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    padding: 0.5rem;
+}
+
+/* Detection Groups */
+.detection-group {
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.detection-class-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    background: #fef3c7;
+    border-bottom: 1px solid #fde68a;
+}
+
+.class-name {
+    font-weight: 600;
+    color: #92400e;
+    flex: 1;
+}
+
+.class-count {
+    font-size: 0.8rem;
+    color: #a16207;
+    background: #fde68a;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+}
+
+.detection-items {
+    background: white;
+}
+
+.detection-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid #f3f4f6;
+    gap: 0.5rem;
+}
+
+.detection-item:last-child {
+    border-bottom: none;
+}
+
+.item-label {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.item-confidence {
+    font-size: 0.75rem;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+}
+
+/* Toggle Switch Styles */
+.detection-toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.detection-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: 0.3s;
+    border-radius: 20px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.detection-toggle input:checked + .toggle-slider {
+    background-color: #10b981;
+}
+
+.detection-toggle input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
+.toggle-slider.small {
+    width: 28px;
+    height: 16px;
+}
+
+.toggle-slider.small:before {
+    height: 10px;
+    width: 10px;
+    left: 3px;
+    bottom: 3px;
+}
+
+.detection-toggle input:checked + .toggle-slider.small:before {
+    transform: translateX(12px);
+}
+
+/* Small toggle for parent */
+.detection-toggle:has(.toggle-slider:not(.small)) {
+    width: 36px;
+    height: 20px;
+}
+
+.detection-toggle:has(.toggle-slider.small) {
+    width: 28px;
+    height: 16px;
+}
+
+.segmentation-loading {
+    text-align: center;
+    padding: 2rem;
+    color: #92400e;
+}
+
+.segmentation-loading .spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
+}
+
+.no-detections {
+    text-align: center;
+    padding: 1.5rem;
+    color: #a16207;
+    font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .segmentation-container {
+        flex-direction: column;
+    }
+    
+    .segmentation-controls {
+        min-width: auto;
+    }
+}
+
+/* COMPRESIÓN */
+.compression-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.compression-item {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.compression-item h4 {
+    margin: 0 0 0.75rem 0;
+    color: #0066cc;
+    font-size: 1rem;
+}
+
+.compression-item img {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.compression-loading {
+    text-align: center;
+    padding: 2rem;
+    color: #0066cc;
+}
+
+.compression-loading .spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
+    border: 4px solid #e0e0e0;
+    border-top-color: #0066cc;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@media (max-width: 768px) {
+    .compression-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="encryption-wrapper">
+    
+    <!-- SECCIÓN 1: UPLOAD -->
+    <div id="uploadSection" class="processor-section active">
+        <div class="processor-card">
+            <h2>🔐 Encriptación Interactiva</h2>
+            <p>Sube una imagen para encriptar o un archivo .enc para desencriptar</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="imageInput" accept="image/*" style="display:none;">
+                <div class="upload-placeholder">
+                    <span class="upload-icon">📁</span>
+                    <p>Haz clic o arrastra una imagen aquí</p>
+                    <small>Formatos: JPG, PNG, BMP (será redimensionada a cuadrada)</small>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 1.5rem 0;">
+                <span style="color: #666;">─── o ───</span>
+            </div>
+            
+            <div style="text-align: center;">
+                <button id="loadEncBtnMain" class="btn-load-enc" style="font-size: 1.1rem; padding: 0.8rem 1.5rem;">
+                    📂 Cargar archivo .enc para desencriptar
+                </button>
+                <input type="file" id="encFileInputMain" accept=".enc,.json" style="display:none;">
+            </div>
+            
+            <div id="uploadStatus" class="status-message" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: IMAGEN CARGADA - ELEGIR ACCIÓN -->
+    <div id="imageSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📷 Imagen Cargada</h2>
+            
+            <div class="image-display">
+                <img id="loadedImage" src="" alt="Imagen cargada">
+            </div>
+            
+            <div class="image-info">
+                <p><strong>Dimensiones:</strong> <span id="imageDims">-</span></p>
+                <p><strong>Estado:</strong> <span id="imageState">Lista para encriptar</span></p>
+            </div>
+            
+            <div style="text-align: center; margin: 1rem 0;">
+                <button id="cropBtn" class="btn-crop" style="display:none;">✂️ Recortar</button>
+                <button id="loadEncBtn" class="btn-load-enc">📂 Cargar .enc</button>
+                <input type="file" id="encFileInput" accept=".enc,.json" style="display:none;">
+            </div>
+            
+            <div class="voice-options" id="mainMenuOptions">
+                <p class="voice-instruction">💡 Usa tu voz o teclado: 1, 2, Enter para confirmar</p>
+                <h3>🎤 ¿Qué deseas hacer?</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 🔐 Encriptar / Desencriptar</span>
+                    <span class="status" id="status-opt1">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - ➕ Más opciones</span>
+                    <span class="status" id="status-opt2">◯</span>
+                </div>
+            </div>
+            
+            <div class="voice-options" id="subMenuOptions" style="display:none;">
+                <p class="voice-instruction">💡 Di el mismo comando 2 veces para volver</p>
+                <h3>🎤 Más opciones:</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 📦 Comprimir imagen</span>
+                    <span class="status" id="status-sub-opt1">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - 🎯 Segmentar imagen</span>
+                    <span class="status" id="status-sub-opt2">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN: COMPRESIÓN DE IMAGEN -->
+    <div id="compressionSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📦 Compresión de Imagen con DCT</h2>
+            <p>Comparación de la imagen original vs comprimida a diferentes niveles</p>
+            
+            <div class="compression-grid">
+                <div class="compression-item">
+                    <h4>Original</h4>
+                    <img id="compOriginal" src="" alt="Original">
+                </div>
+                <div class="compression-item">
+                    <h4>30% Compresión</h4>
+                    <img id="comp30" src="" alt="30% Compresión">
+                </div>
+                <div class="compression-item">
+                    <h4>50% Compresión</h4>
+                    <img id="comp50" src="" alt="50% Compresión">
+                </div>
+                <div class="compression-item">
+                    <h4>80% Compresión</h4>
+                    <img id="comp80" src="" alt="80% Compresión">
+                </div>
+            </div>
+            
+            <div class="compression-loading" id="compressionLoading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Comprimiendo imagen...</p>
+            </div>
+            
+            <div class="voice-options" style="margin-top: 1.5rem;">
+                <p class="voice-instruction">💡 Di UNO para volver a subir otra imagen</p>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 📤 Subir otra imagen</span>
+                    <span class="status" id="status-comp-opt1">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: SEGMENTACIÓN -->
+    <div id="segmentSection" class="processor-section" style="display:none;">
+        <div class="processor-card segmentation-card">
+            <h2>🎯 Segmentación de Imagen</h2>
+            <p>Objetos detectados en la imagen</p>
+            
+            <div class="segmentation-container">
+                <div class="segmentation-image-wrapper">
+                    <img id="segmentedImage" src="" alt="Imagen segmentada">
+                </div>
+                
+                <div class="segmentation-controls">
+                    <div class="mode-selector">
+                        <button class="mode-btn active" id="segModeBox">📦 Cajas</button>
+                        <button class="mode-btn" id="segModeMask">🎭 Máscaras</button>
+                    </div>
+                    
+                    <div class="detections-header">
+                        <h4>Objetos detectados:</h4>
+                        <div class="toggle-all-btns">
+                            <button class="toggle-btn" id="segShowAll">👁️ Todos</button>
+                            <button class="toggle-btn" id="segHideAll">🚫 Ninguno</button>
+                        </div>
+                    </div>
+                    
+                    <div class="detections-list" id="segDetectionsList">
+                        <!-- Lista de detecciones -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="segmentation-loading" id="segmentationLoading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Detectando objetos...</p>
+            </div>
+            
+            <div class="voice-options" style="margin-top: 1.5rem;">
+                <p class="voice-instruction">💡 Di UNO para volver a subir otra imagen</p>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 📤 Subir otra imagen</span>
+                    <span class="status" id="status-seg-opt1">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: PARÁMETROS DE ENCRIPTACIÓN -->
+    <div id="paramsSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>🎚️ Parámetros de Encriptación</h2>
+            <p>Ajusta los parámetros y di CONFIRMAR para encriptar</p>
+            
+            <div class="param-section">
+                <h4>📐 Parámetros FrDCT (α)</h4>
+                <div style="margin-bottom: 0.8rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="syncAlphas" checked>
+                        <span style="font-size: 0.9rem;">Sincronizar canales RGB</span>
+                    </label>
+                </div>
+                <div class="param-row">
+                    <label><span style="color:#ef4444; font-weight:bold;">R</span> α₁:</label>
+                    <input type="range" id="alphaRSlider" min="0" max="1.99" step="0.01" value="0.5">
+                    <span class="param-value" id="alphaRValue">0.50</span>
+                </div>
+                <div class="param-row">
+                    <label><span style="color:#22c55e; font-weight:bold;">G</span> α₂:</label>
+                    <input type="range" id="alphaGSlider" min="0" max="1.99" step="0.01" value="0.5">
+                    <span class="param-value" id="alphaGValue">0.50</span>
+                </div>
+                <div class="param-row">
+                    <label><span style="color:#3b82f6; font-weight:bold;">B</span> α₃:</label>
+                    <input type="range" id="alphaBSlider" min="0" max="1.99" step="0.01" value="0.5">
+                    <span class="param-value" id="alphaBValue">0.50</span>
+                </div>
+            </div>
+            
+            <div class="param-section">
+                <h4>🔑 Arnold Transform</h4>
+                <div class="param-row">
+                    <label>Parámetro a:</label>
+                    <input type="range" id="arnoldASlider" min="1" max="10" step="1" value="1">
+                    <span class="param-value" id="arnoldAValue">1</span>
+                </div>
+                <div class="param-row">
+                    <label>Iteraciones k:</label>
+                    <input type="range" id="arnoldKSlider" min="1" max="20" step="1" value="1">
+                    <span class="param-value" id="arnoldKValue">1</span>
+                </div>
+            </div>
+            
+            <div class="voice-options">
+                <p class="voice-instruction">💡 Ajusta los parámetros con el mouse, luego di CONFIRMAR</p>
+                <h3>🎤 Opciones:</h3>
+                <div class="option-item" data-option="confirmar">
+                    <span class="option-text"><strong>CONFIRMAR</strong> - ✅ Ejecutar encriptación</span>
+                    <span class="status" id="status-params-confirm">◯</span>
+                </div>
+                <!-- 'Regresar' option removed as requested -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: PROCESO DE ENCRIPTACIÓN -->
+    <div id="encryptingSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📊 Proceso de Encriptación (Algorithm 5)</h2>
+            <p style="color: var(--gray);">RGB → FrDCT(α₁,α₂,α₃) → DOST → Arnold(a,k)</p>
+            
+            <div class="process-steps">
+                <div class="step-item">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Original</div>
+                    <div class="step-description">Imagen RGB</div>
+                    <img id="step1" src="" alt="Original" style="display:none;">
+                    <div class="step-placeholder" id="step1-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">2</div>
+                    <div class="step-title">FrDCT</div>
+                    <div class="step-description">Con α₁, α₂, α₃</div>
+                    <img id="step2" src="" alt="FrDCT" style="display:none;">
+                    <div class="step-placeholder" id="step2-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">3</div>
+                    <div class="step-title">DOST</div>
+                    <div class="step-description">Decorrelación</div>
+                    <img id="step3" src="" alt="DOST" style="display:none;">
+                    <div class="step-placeholder" id="step3-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">4</div>
+                    <div class="step-title">🔒 Arnold</div>
+                    <div class="step-description">E(α,S) Cifrada</div>
+                    <img id="step4" src="" alt="Cifrada" style="display:none;">
+                    <div class="step-placeholder" id="step4-ph">Cargando...</div>
+                </div>
+            </div>
+            
+            <!-- Capas RGB intermedias -->
+            <div id="rgbLayersSection" style="margin-top: 1.5rem; display:none;">
+                <h3 style="color: var(--primary); margin-bottom: 1rem;">🎨 Capas RGB Intermedias</h3>
+                
+                <div class="rgb-layers-grid">
+                    <div class="rgb-layer-group">
+                        <h5 style="color: #ef4444;">Canal R (Rojo)</h5>
+                        <div class="rgb-steps">
+                            <div class="rgb-step">
+                                <small>FrDCT</small>
+                                <img id="layer-r-frdct" src="" alt="R FrDCT">
+                            </div>
+                            <div class="rgb-step">
+                                <small>DOST</small>
+                                <img id="layer-r-dost" src="" alt="R DOST">
+                            </div>
+                            <div class="rgb-step">
+                                <small>Arnold</small>
+                                <img id="layer-r-arnold" src="" alt="R Arnold">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="rgb-layer-group">
+                        <h5 style="color: #22c55e;">Canal G (Verde)</h5>
+                        <div class="rgb-steps">
+                            <div class="rgb-step">
+                                <small>FrDCT</small>
+                                <img id="layer-g-frdct" src="" alt="G FrDCT">
+                            </div>
+                            <div class="rgb-step">
+                                <small>DOST</small>
+                                <img id="layer-g-dost" src="" alt="G DOST">
+                            </div>
+                            <div class="rgb-step">
+                                <small>Arnold</small>
+                                <img id="layer-g-arnold" src="" alt="G Arnold">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="rgb-layer-group">
+                        <h5 style="color: #3b82f6;">Canal B (Azul)</h5>
+                        <div class="rgb-steps">
+                            <div class="rgb-step">
+                                <small>FrDCT</small>
+                                <img id="layer-b-frdct" src="" alt="B FrDCT">
+                            </div>
+                            <div class="rgb-step">
+                                <small>DOST</small>
+                                <img id="layer-b-dost" src="" alt="B DOST">
+                            </div>
+                            <div class="rgb-step">
+                                <small>Arnold</small>
+                                <img id="layer-b-arnold" src="" alt="B Arnold">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 5: RESULTADO ENCRIPTACIÓN -->
+    <div id="encryptResultSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>✅ Imagen Encriptada</h2>
+            
+            <div class="comparison-container">
+                <div class="comparison-item">
+                    <h3>📷 Original</h3>
+                    <img id="resultOriginal" src="" alt="Original">
+                </div>
+                <div class="comparison-item">
+                    <h3>🔒 Cifrada</h3>
+                    <img id="resultEncrypted" src="" alt="Cifrada">
+                </div>
+            </div>
+            
+            <div class="image-info">
+                <p><strong>Clave:</strong> 
+                    αR=<span id="keyAlphaR">-</span>, 
+                    αG=<span id="keyAlphaG">-</span>, 
+                    αB=<span id="keyAlphaB">-</span>, 
+                    a=<span id="keyA">-</span>, 
+                    k=<span id="keyK">-</span>, 
+                    comp=<span id="keyComp">-</span>%
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 1rem 0;">
+                <button id="downloadEncBtn" class="btn-download">📥 Guardar datos cifrados (.enc)</button>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones:</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 🔓 Desencriptar esta imagen</span>
+                    <span class="status" id="status-enc-decrypt">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - 📤 Nueva imagen</span>
+                    <span class="status" id="status-enc-new">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 5B: COMPARACIÓN DE COMPRESIONES -->
+    <div id="compressionCompareSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>📊 Comparación de Niveles de Compresión</h2>
+            <p style="color: var(--gray);">Imagen original encriptada con diferentes niveles de compresión</p>
+            
+            <div class="compression-grid">
+                <div class="compression-item">
+                    <h3>📷 Original</h3>
+                    <img id="comp-original" src="" alt="Original">
+                    <p class="comp-info">Sin comprimir</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔒 30% Compresión</h3>
+                    <img id="comp-30" src="" alt="30%">
+                    <p class="comp-info">70% datos conservados</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔒 50% Compresión</h3>
+                    <img id="comp-50" src="" alt="50%">
+                    <p class="comp-info">50% datos conservados</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔒 80% Compresión</h3>
+                    <img id="comp-80" src="" alt="80%">
+                    <p class="comp-info">20% datos conservados</p>
+                </div>
+            </div>
+            
+            <div class="image-info">
+                <p><strong>Clave:</strong> 
+                    αR=<span id="compKeyAlphaR">-</span>, 
+                    αG=<span id="compKeyAlphaG">-</span>, 
+                    αB=<span id="compKeyAlphaB">-</span>, 
+                    a=<span id="compKeyA">-</span>, 
+                    k=<span id="compKeyK">-</span>
+                </p>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones:</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 🔓 Desencriptar todas las versiones</span>
+                    <span class="status" id="status-comp-decrypt">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - 📤 Nueva imagen</span>
+                    <span class="status" id="status-comp-new">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 5C: RESULTADO DESENCRIPTACIÓN MÚLTIPLE -->
+    <div id="decryptCompareSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>🔓 Comparación de Desencriptación</h2>
+            <p style="color: var(--gray);">Calidad de recuperación según nivel de compresión</p>
+            
+            <div class="compression-grid">
+                <div class="compression-item">
+                    <h3>📷 Original</h3>
+                    <img id="dec-comp-original" src="" alt="Original">
+                    <p class="comp-info">Imagen fuente</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔓 30% Compresión</h3>
+                    <img id="dec-comp-30" src="" alt="30%">
+                    <p class="comp-info dec-psnr" id="psnr-30">PSNR: -</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔓 50% Compresión</h3>
+                    <img id="dec-comp-50" src="" alt="50%">
+                    <p class="comp-info dec-psnr" id="psnr-50">PSNR: -</p>
+                </div>
+                <div class="compression-item">
+                    <h3>🔓 80% Compresión</h3>
+                    <img id="dec-comp-80" src="" alt="80%">
+                    <p class="comp-info dec-psnr" id="psnr-80">PSNR: -</p>
+                </div>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones:</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 📤 Nueva imagen</span>
+                    <span class="status" id="status-deccomp-new">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - 🔄 Re-encriptar con otros parámetros</span>
+                    <span class="status" id="status-deccomp-reenc">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 6: PROCESO DE DESENCRIPTACIÓN -->
+    <div id="decryptingSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>🔓 Proceso de Desencriptación (Algorithm 6)</h2>
+            <p style="color: var(--gray);">Cifrada → Arnold⁻¹(a,k) → IDOST → IFrDCT(-α) → RGB Recuperada</p>
+            
+            <div class="process-steps">
+                <div class="step-item">
+                    <div class="step-number">1</div>
+                    <div class="step-title">🔒 Cifrada</div>
+                    <div class="step-description">E(α, S)</div>
+                    <img id="dec-step1" src="" alt="Cifrada" style="display:none;">
+                    <div class="step-placeholder" id="dec-step1-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Arnold⁻¹</div>
+                    <div class="step-description">D(E) Descifrado</div>
+                    <img id="dec-step2" src="" alt="Arnold inv" style="display:none;">
+                    <div class="step-placeholder" id="dec-step2-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">3</div>
+                    <div class="step-title">IDOST</div>
+                    <div class="step-description">Inversa DOST</div>
+                    <img id="dec-step3" src="" alt="IDOST" style="display:none;">
+                    <div class="step-placeholder" id="dec-step3-ph">Cargando...</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">4</div>
+                    <div class="step-title">🔓 IFrDCT</div>
+                    <div class="step-description">Imagen Recuperada</div>
+                    <img id="dec-step4" src="" alt="Recuperada" style="display:none;">
+                    <div class="step-placeholder" id="dec-step4-ph">Cargando...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 7: RESULTADO DESENCRIPTACIÓN -->
+    <div id="decryptResultSection" class="processor-section" style="display:none;">
+        <div class="processor-card">
+            <h2>✅ Imagen Desencriptada</h2>
+            
+            <div class="comparison-container">
+                <div class="comparison-item">
+                    <h3>🔒 Cifrada</h3>
+                    <img id="decResultEncrypted" src="" alt="Cifrada">
+                </div>
+                <div class="comparison-item">
+                    <h3>🔓 Recuperada</h3>
+                    <img id="decResultDecrypted" src="" alt="Recuperada">
+                </div>
+            </div>
+            
+            <div class="voice-options">
+                <h3>🎤 Opciones:</h3>
+                <div class="option-item" data-option="uno">
+                    <span class="option-text"><strong>UNO</strong> - 📤 Nueva imagen</span>
+                    <span class="status" id="status-dec-new">◯</span>
+                </div>
+                <div class="option-item" data-option="dos">
+                    <span class="option-text"><strong>DOS</strong> - 🔒 Volver a encriptar</span>
+                    <span class="status" id="status-dec-encrypt">◯</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- CONFIRMATION MODAL -->
+<div id="confirmationModalOverlay" class="confirmation-modal-overlay"></div>
+<div id="confirmationModal" class="confirmation-modal">
+    <div class="confirmation-header">
+        <h3>🤔 ¿Estás seguro?</h3>
+    </div>
+    <div class="confirmation-body">
+        <p id="confirmationMessage">Se ejecutará la acción seleccionada</p>
+    </div>
+    <div class="confirmation-footer">
+        <div class="button-group">
+            <div class="button-wrapper">
+                <span class="button-number">1</span>
+                <button class="btn-confirm" id="btnConfirmYes">Confirmar ✅</button>
+            </div>
+            <div class="button-wrapper">
+                <span class="button-number">2</span>
+                <button class="btn-cancel" id="btnConfirmNo">Cancelar ❌</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirmation-hint">Di UNO para confirmar o DOS para cancelar</div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Procesando...</div>
+</div>
+
+<!-- CROP MODAL -->
+<div id="cropModal" class="crop-modal">
+    <div class="crop-modal-content">
+        <div class="crop-modal-header">
+            <h2>✂️ Recortar Imagen a Cuadrado</h2>
+            <button class="crop-close-btn" id="cropCloseBtn">&times;</button>
+        </div>
+        
+        <div class="crop-info-box">
+            <p><strong>⚠️ La imagen no es cuadrada</strong></p>
+            <p>La Transformación de Arnold requiere imágenes cuadradas (N × N).</p>
+            <small>Selecciona el área cuadrada haciendo clic y arrastrando sobre la imagen.</small>
+        </div>
+        
+        <div class="crop-canvas-container">
+            <canvas id="cropCanvas"></canvas>
+        </div>
+        
+        <div style="text-align: center; margin: 0.5rem 0;">
+            <span id="cropSizeDisplay" style="font-weight: 600; color: var(--primary);"></span>
+        </div>
+        
+        <h4 style="margin: 1rem 1rem 0.5rem 1rem; color: var(--primary);">📐 Tamaños predefinidos:</h4>
+        <div class="crop-presets" id="cropPresets"></div>
+        
+        <div class="crop-controls">
+            <div class="crop-control-item">
+                <label>Posición X:</label>
+                <input type="number" id="cropX" min="0" value="0">
+            </div>
+            <div class="crop-control-item">
+                <label>Posición Y:</label>
+                <input type="number" id="cropY" min="0" value="0">
+            </div>
+            <div class="crop-control-item">
+                <label>Tamaño (N × N):</label>
+                <input type="number" id="cropSizeInput" min="1" value="256">
+            </div>
+        </div>
+        
+        <div class="crop-modal-footer">
+            <button class="btn btn-cancel-crop" id="cropCancelBtn">❌ Cancelar</button>
+            <button class="btn btn-apply-crop" id="cropApplyBtn">✂️ Recortar</button>
+        </div>
+    </div>
+</div>
+
+<!-- AUDIO MODAL -->
+<div id="audioModal" class="audio-modal hidden">
+    <div class="audio-modal-header">
+        <h3>🎤 Micrófono</h3>
+        <button class="dropdown-toggle" id="optionsDropdown" title="Opciones">⋮</button>
+    </div>
+    <div class="dropdown-menu-voice" id="dropdownMenu" style="display:none;">
+        <label class="dropdown-item-voice">
+            <input type="checkbox" id="doubleConfirmToggle" checked>
+            <span>🔐 Doble confirmación</span>
+        </label>
+        <label class="dropdown-item-voice">
+            <input type="checkbox" id="continuousListenToggle">
+            <span>🔄 Escucha continua</span>
+        </label>
+    </div>
+    <button class="recording-button" id="recordButton">🎙️</button>
+    <div class="recording-timer" id="recordingTimer" style="display:none;">Grabando: <span id="timerCount">0</span>s</div>
+    <div class="audio-status" id="audioStatus">✅ Presiona para grabar</div>
+    <div class="audio-level-container" id="audioLevelContainer" style="display:none;">
+        <div class="audio-level-bar" id="audioLevelBar"></div>
+    </div>
+    <div class="vad-indicator" id="vadIndicator" style="display:none;">
+        <div class="vad-dot" id="vadDot"></div>
+        <span id="vadText">VAD: Silencio</span>
+    </div>
+</div>
+
+<script>
+// ============ ESTADO GLOBAL ============
+let currentState = 'upload';
+let selectedOption = null;
+let doubleConfirmEnabled = true;
+let showingConfirmationModal = false;
+let confirmationModalSelection = null;
+
+// Submenú y comando repetido
+let inSubMenu = false;
+let lastCommand = null;
+let lastCommandTime = 0;
+const DOUBLE_COMMAND_TIMEOUT = 2000; // 2 segundos para detectar comando repetido
+
+// Datos de imagen y encriptación
+let originalImageBase64 = null;
+let workingImageBase64 = null;
+let encryptedImageBase64 = null;
+let encryptedData = null;
+let imageSize = 256;
+let loadedFromEncFile = false;  // Flag para saber si cargamos desde .enc
+
+// YOLO state
+let yoloDetectionsInt = [];
+let yoloVisibleIdsInt = [];  // IDs de detecciones visibles
+let yoloModeInt = 'box'; // 'box' or 'mask'
+let yoloOriginalImageInt = null;  // Imagen original para re-renderizar
+
+// Parámetros de encriptación
+let alphaR = 0.5;
+let alphaG = 0.5;
+let alphaB = 0.5;
+let arnoldA = 1;
+let arnoldK = 1;
+let syncAlphas = true;
+
+// ============ ELEMENTOS DOM ============
+const uploadArea = document.getElementById('uploadArea');
+const imageInput = document.getElementById('imageInput');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const audioStatus = document.getElementById('audioStatus');
+
+// ============ SLIDERS RGB ============
+const alphaRSlider = document.getElementById('alphaRSlider');
+const alphaGSlider = document.getElementById('alphaGSlider');
+const alphaBSlider = document.getElementById('alphaBSlider');
+const syncAlphasCheckbox = document.getElementById('syncAlphas');
+
+alphaRSlider.addEventListener('input', (e) => {
+    alphaR = parseFloat(e.target.value);
+    document.getElementById('alphaRValue').textContent = alphaR.toFixed(2);
+    if (syncAlphas) {
+        alphaG = alphaR;
+        alphaB = alphaR;
+        alphaGSlider.value = alphaR;
+        alphaBSlider.value = alphaR;
+        document.getElementById('alphaGValue').textContent = alphaR.toFixed(2);
+        document.getElementById('alphaBValue').textContent = alphaR.toFixed(2);
+    }
+});
+
+alphaGSlider.addEventListener('input', (e) => {
+    alphaG = parseFloat(e.target.value);
+    document.getElementById('alphaGValue').textContent = alphaG.toFixed(2);
+    if (syncAlphas) {
+        alphaR = alphaG;
+        alphaB = alphaG;
+        alphaRSlider.value = alphaG;
+        alphaBSlider.value = alphaG;
+        document.getElementById('alphaRValue').textContent = alphaG.toFixed(2);
+        document.getElementById('alphaBValue').textContent = alphaG.toFixed(2);
+    }
+});
+
+alphaBSlider.addEventListener('input', (e) => {
+    alphaB = parseFloat(e.target.value);
+    document.getElementById('alphaBValue').textContent = alphaB.toFixed(2);
+    if (syncAlphas) {
+        alphaR = alphaB;
+        alphaG = alphaB;
+        alphaRSlider.value = alphaB;
+        alphaGSlider.value = alphaB;
+        document.getElementById('alphaRValue').textContent = alphaB.toFixed(2);
+        document.getElementById('alphaGValue').textContent = alphaB.toFixed(2);
+    }
+});
+
+syncAlphasCheckbox.addEventListener('change', (e) => {
+    syncAlphas = e.target.checked;
+    if (syncAlphas) {
+        // Sincronizar todos al valor de R
+        alphaG = alphaR;
+        alphaB = alphaR;
+        alphaGSlider.value = alphaR;
+        alphaBSlider.value = alphaR;
+        document.getElementById('alphaGValue').textContent = alphaR.toFixed(2);
+        document.getElementById('alphaBValue').textContent = alphaR.toFixed(2);
+    }
+});
+
+document.getElementById('arnoldASlider').addEventListener('input', (e) => {
+    arnoldA = parseInt(e.target.value);
+    document.getElementById('arnoldAValue').textContent = arnoldA;
+});
+
+document.getElementById('arnoldKSlider').addEventListener('input', (e) => {
+    arnoldK = parseInt(e.target.value);
+    document.getElementById('arnoldKValue').textContent = arnoldK;
+});
+
+// Compresión removida del pipeline de encriptación
+
+// ============ YOLO DETECTION (Interactive) ============
+
+// YOLO Elements
+const yoloEnabledInt = document.getElementById('yoloEnabledInteractive');
+const yoloControlsInt = document.getElementById('yoloControlsInteractive');
+const yoloModeBoxInt = document.getElementById('yoloModeBoxInt');
+const yoloModeMaskInt = document.getElementById('yoloModeMaskInt');
+const yoloDetectBtnInt = document.getElementById('yoloDetectBtnInt');
+const yoloResultsInt = document.getElementById('yoloResultsInt');
+const yoloDetectionsListInt = document.getElementById('yoloDetectionsListInt');
+const yoloPreviewContainerInt = document.getElementById('yoloPreviewContainerInt');
+const yoloAnnotatedImgInt = document.getElementById('yoloAnnotatedImgInt');
+const yoloResetBtnInt = document.getElementById('yoloResetBtnInt');
+const yoloShowAllBtnInt = document.getElementById('yoloShowAllBtnInt');
+const yoloHideAllBtnInt = document.getElementById('yoloHideAllBtnInt');
+const yoloLoadingInt = document.getElementById('yoloLoadingInt');
+
+// Reset YOLO state
+function resetYoloStateInt() {
+    yoloDetectionsInt = [];
+    yoloVisibleIdsInt = [];
+    yoloOriginalImageInt = null;
+    if (yoloResultsInt) yoloResultsInt.style.display = 'none';
+    if (yoloDetectionsListInt) yoloDetectionsListInt.innerHTML = '';
+    if (yoloPreviewContainerInt) yoloPreviewContainerInt.style.display = 'none';
+}
+
+// Toggle YOLO controls
+if (yoloEnabledInt) {
+    yoloEnabledInt.addEventListener('change', function() {
+        yoloControlsInt.style.display = this.checked ? 'block' : 'none';
+        if (!this.checked) {
+            resetYoloStateInt();
+        }
+    });
+}
+
+// Mode selection - also re-render when mode changes
+if (yoloModeBoxInt) {
+    yoloModeBoxInt.addEventListener('click', function() {
+        yoloModeInt = 'box';
+        yoloModeBoxInt.classList.add('active');
+        yoloModeMaskInt.classList.remove('active');
+        // Re-render if we have detections
+        if (yoloDetectionsInt.length > 0 && yoloOriginalImageInt) {
+            renderYoloImageInt();
+        }
+    });
+}
+
+if (yoloModeMaskInt) {
+    yoloModeMaskInt.addEventListener('click', function() {
+        yoloModeInt = 'mask';
+        yoloModeMaskInt.classList.add('active');
+        yoloModeBoxInt.classList.remove('active');
+        // Re-render if we have detections
+        if (yoloDetectionsInt.length > 0 && yoloOriginalImageInt) {
+            renderYoloImageInt();
+        }
+    });
+}
+
+// Detect objects
+if (yoloDetectBtnInt) {
+    yoloDetectBtnInt.addEventListener('click', detectObjectsInt);
+}
+
+async function detectObjectsInt() {
+    if (!workingImageBase64 && !originalImageBase64) {
+        alert('Por favor, carga una imagen primero');
+        return;
+    }
+    
+    const imageToUse = workingImageBase64 || originalImageBase64;
+    
+    yoloLoadingInt.style.display = 'block';
+    yoloResultsInt.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/yolo/detect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: imageToUse,
+                mode: yoloModeInt,
+                confidence: 0.25
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            yoloDetectionsInt = data.detections;
+            yoloOriginalImageInt = data.original_image;  // Guardar imagen original para re-render
+            
+            // Todos visibles por defecto
+            yoloVisibleIdsInt = yoloDetectionsInt.map(d => d.id);
+            
+            // Show results
+            yoloLoadingInt.style.display = 'none';
+            yoloResultsInt.style.display = 'block';
+            
+            // Show annotated image
+            if (data.annotated_image) {
+                yoloAnnotatedImgInt.src = data.annotated_image;
+                yoloPreviewContainerInt.style.display = 'block';
+            }
+            
+            // Populate detections list with visibility toggles
+            renderDetectionsListInt();
+            
+        } else {
+            throw new Error(data.error || 'Error en detección');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+    
+    yoloLoadingInt.style.display = 'none';
+}
+
+function renderDetectionsListInt() {
+    yoloDetectionsListInt.innerHTML = '';
+    
+    if (yoloDetectionsInt.length === 0) {
+        yoloDetectionsListInt.innerHTML = '<div class="yolo-no-detections">No se detectaron objetos</div>';
+        return;
+    }
+    
+    yoloDetectionsInt.forEach((det) => {
+        const isVisible = yoloVisibleIdsInt.includes(det.id);
+        const item = document.createElement('div');
+        item.className = 'yolo-detection-item' + (isVisible ? ' visible' : '');
+        item.dataset.id = det.id;
+        item.innerHTML = `
+            <input type="checkbox" class="yolo-detection-checkbox" ${isVisible ? 'checked' : ''}>
+            <div class="yolo-detection-info">
+                <div class="yolo-detection-class">${det.class}</div>
+                <div class="yolo-detection-conf">Confianza: ${(det.confidence * 100).toFixed(1)}%</div>
+            </div>
+            <span class="visibility-icon">${isVisible ? '👁️' : '🚫'}</span>
+        `;
+        
+        // Handle checkbox change (toggle visibility)
+        const checkbox = item.querySelector('.yolo-detection-checkbox');
+        checkbox.addEventListener('change', function() {
+            toggleDetectionVisibilityInt(det.id, this.checked);
+        });
+        
+        // Click on item to toggle
+        item.addEventListener('click', function(e) {
+            if (e.target !== checkbox) {
+                checkbox.checked = !checkbox.checked;
+                toggleDetectionVisibilityInt(det.id, checkbox.checked);
+            }
+        });
+        
+        yoloDetectionsListInt.appendChild(item);
+    });
+}
+
+function toggleDetectionVisibilityInt(detId, isVisible) {
+    if (isVisible) {
+        if (!yoloVisibleIdsInt.includes(detId)) {
+            yoloVisibleIdsInt.push(detId);
+        }
+    } else {
+        yoloVisibleIdsInt = yoloVisibleIdsInt.filter(id => id !== detId);
+    }
+    
+    // Update item appearance
+    const item = yoloDetectionsListInt.querySelector(`[data-id="${detId}"]`);
+    if (item) {
+        item.classList.toggle('visible', isVisible);
+        item.querySelector('.visibility-icon').textContent = isVisible ? '👁️' : '🚫';
+    }
+    
+    // Re-render image
+    renderYoloImageInt();
+}
+
+async function renderYoloImageInt() {
+    if (!yoloOriginalImageInt || yoloDetectionsInt.length === 0) return;
+    
+    try {
+        const response = await fetch('/api/yolo/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: yoloOriginalImageInt,
+                detections: yoloDetectionsInt,
+                visible_ids: yoloVisibleIdsInt,
+                mode: yoloModeInt
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            yoloAnnotatedImgInt.src = data.rendered_image;
+        }
+    } catch (error) {
+        console.error('Error rendering YOLO:', error);
+    }
+}
+
+// Show All button
+if (yoloShowAllBtnInt) {
+    yoloShowAllBtnInt.addEventListener('click', function() {
+        yoloVisibleIdsInt = yoloDetectionsInt.map(d => d.id);
+        // Update all checkboxes
+        yoloDetectionsListInt.querySelectorAll('.yolo-detection-item').forEach(item => {
+            item.classList.add('visible');
+            item.querySelector('.yolo-detection-checkbox').checked = true;
+            item.querySelector('.visibility-icon').textContent = '👁️';
+        });
+        renderYoloImageInt();
+    });
+}
+
+// Hide All button
+if (yoloHideAllBtnInt) {
+    yoloHideAllBtnInt.addEventListener('click', function() {
+        yoloVisibleIdsInt = [];
+        // Update all checkboxes
+        yoloDetectionsListInt.querySelectorAll('.yolo-detection-item').forEach(item => {
+            item.classList.remove('visible');
+            item.querySelector('.yolo-detection-checkbox').checked = false;
+            item.querySelector('.visibility-icon').textContent = '🚫';
+        });
+        renderYoloImageInt();
+    });
+}
+
+// Reset YOLO
+if (yoloResetBtnInt) {
+    yoloResetBtnInt.addEventListener('click', function() {
+        resetYoloStateInt();
+    });
+}
+
+// ============ END YOLO DETECTION ============
+
+// ============ UPLOAD ============
+uploadArea.addEventListener('click', () => imageInput.click());
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = 'rgba(0, 102, 204, 0.1)';
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.style.background = '');
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = '';
+    if (e.dataTransfer.files.length) {
+        imageInput.files = e.dataTransfer.files;
+        handleImageUpload();
+    }
+});
+imageInput.addEventListener('change', handleImageUpload);
+
+async function handleImageUpload() {
+    const file = imageInput.files[0];
+    if (!file) return;
+    
+    showLoading('Cargando imagen...');
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const img = new Image();
+        img.onload = async () => {
+            originalImageBase64 = e.target.result;
+            workingImageBase64 = originalImageBase64;
+            
+            imageSize = Math.min(img.width, img.height);
+            
+            document.getElementById('loadedImage').src = originalImageBase64;
+            document.getElementById('imageDims').textContent = `${img.width} × ${img.height}`;
+            document.getElementById('imageState').textContent = 'Lista para encriptar';
+            
+            // Show crop button if not square
+            const cropBtn = document.getElementById('cropBtn');
+            if (img.width !== img.height) {
+                cropBtn.style.display = 'inline-block';
+                document.getElementById('imageState').textContent = '⚠️ Imagen no cuadrada - Se recomienda recortar';
+            } else {
+                cropBtn.style.display = 'none';
+            }
+            
+            // Reset encrypted data
+            encryptedData = null;
+            encryptedImageBase64 = null;
+            
+            hideLoading();
+            switchSection('image');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// ============ SECCIONES ============
+function switchSection(section) {
+    document.querySelectorAll('.processor-section').forEach(s => {
+        s.style.display = 'none';
+        s.classList.remove('active');
+    });
+    
+    const sectionMap = {
+        'upload': 'uploadSection',
+        'image': 'imageSection',
+        'segment': 'segmentSection',
+        'compression': 'compressionSection',
+        'params': 'paramsSection',
+        'encrypting': 'encryptingSection',
+        'encryptResult': 'encryptResultSection',
+        'decrypting': 'decryptingSection',
+        'decryptResult': 'decryptResultSection'
+    };
+    
+    if (sectionMap[section]) {
+        const elem = document.getElementById(sectionMap[section]);
+        elem.style.display = 'block';
+        elem.classList.add('active');
+    }
+    
+    currentState = section;
+    selectedOption = null;
+    updateStatusIndicators();
+}
+
+// Datos de la encriptación
+let encryptedDataResult = null;
+let encryptedImageResult = null;
+
+// ============ ENCRIPTACIÓN ============
+async function performEncryption() {
+    showLoading('Encriptando imagen...');
+    switchSection('encrypting');
+    
+    try {
+        const response = await fetch('/api/encryption/encrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: workingImageBase64,
+                alpha_r: alphaR,
+                alpha_g: alphaG,
+                alpha_b: alphaB,
+                arnold_a: arnoldA,
+                arnold_k: arnoldK
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+        
+        encryptedDataResult = data.encrypted_data;
+        encryptedImageResult = data.encrypted;
+        encryptedData = data.encrypted_data;
+        encryptedImageBase64 = data.encrypted;
+        
+        // Mostrar pasos de la encriptación
+        setTimeout(() => showStepImage('step1', 'step1-ph', data.original), 100);
+        setTimeout(() => showStepImage('step2', 'step2-ph', data.after_frdct), 300);
+        setTimeout(() => showStepImage('step3', 'step3-ph', data.after_dost), 500);
+        setTimeout(() => showStepImage('step4', 'step4-ph', data.encrypted), 700);
+        
+        // Mostrar capas RGB si están disponibles
+        if (data.after_frdct_channels && data.after_dost_channels && data.encrypted_channels) {
+            if (data.after_frdct_channels.r) document.getElementById('layer-r-frdct').src = data.after_frdct_channels.r;
+            if (data.after_dost_channels.r) document.getElementById('layer-r-dost').src = data.after_dost_channels.r;
+            if (data.encrypted_channels.r) document.getElementById('layer-r-arnold').src = data.encrypted_channels.r;
+            if (data.after_frdct_channels.g) document.getElementById('layer-g-frdct').src = data.after_frdct_channels.g;
+            if (data.after_dost_channels.g) document.getElementById('layer-g-dost').src = data.after_dost_channels.g;
+            if (data.encrypted_channels.g) document.getElementById('layer-g-arnold').src = data.encrypted_channels.g;
+            if (data.after_frdct_channels.b) document.getElementById('layer-b-frdct').src = data.after_frdct_channels.b;
+            if (data.after_dost_channels.b) document.getElementById('layer-b-dost').src = data.after_dost_channels.b;
+            if (data.encrypted_channels.b) document.getElementById('layer-b-arnold').src = data.encrypted_channels.b;
+            document.getElementById('rgbLayersSection').style.display = 'block';
+        }
+        
+        // Actualizar resultado
+        document.getElementById('resultOriginal').src = data.original;
+        document.getElementById('resultEncrypted').src = data.encrypted;
+        document.getElementById('keyAlphaR').textContent = alphaR.toFixed(2);
+        document.getElementById('keyAlphaG').textContent = alphaG.toFixed(2);
+        document.getElementById('keyAlphaB').textContent = alphaB.toFixed(2);
+        document.getElementById('keyA').textContent = arnoldA;
+        document.getElementById('keyK').textContent = arnoldK;
+        
+        hideLoading();
+        
+        // Ir a resultado de encriptación
+        setTimeout(() => {
+            switchSection('encryptResult');
+        }, 1500);
+        
+    } catch (error) {
+        hideLoading();
+        alert('Error: ' + error.message);
+        switchSection('image');
+    }
+}
+
+// ============ SEGMENTACIÓN CON YOLO ============
+let segmentationDetections = [];
+let segmentationVisibleIds = [];
+let segmentationShowMasks = false;
+let segmentationOriginalImage = null;
+
+// ============ COMPRESIÓN ============
+async function performCompression() {
+    showLoading('Comprimiendo imagen al 30%, 50% y 80%...');
+    document.getElementById('compressionLoading').style.display = 'flex';
+    
+    try {
+        const imageToUse = workingImageBase64 || originalImageBase64;
+        if (!imageToUse) {
+            throw new Error('No hay imagen para comprimir');
+        }
+        
+        const response = await fetch('/api/encryption/compress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: imageToUse
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Error en la compresión');
+        }
+        
+        // Mostrar las imágenes comprimidas
+        document.getElementById('compOriginal').src = 'data:image/png;base64,' + data.original;
+        document.getElementById('comp30').src = 'data:image/png;base64,' + data.compressed_30;
+        document.getElementById('comp50').src = 'data:image/png;base64,' + data.compressed_50;
+        document.getElementById('comp80').src = 'data:image/png;base64,' + data.compressed_80;
+        
+        hideLoading();
+        document.getElementById('compressionLoading').style.display = 'none';
+        
+        // Ocultar submenú y mostrar sección de compresión
+        hideSubMenu();
+        switchSection('compression');
+        
+    } catch (error) {
+        hideLoading();
+        document.getElementById('compressionLoading').style.display = 'none';
+        alert('Error en compresión: ' + error.message);
+        console.error('Compression error:', error);
+    }
+}
+
+async function performSegmentation() {
+    showLoading('Detectando objetos con YOLO...');
+    document.getElementById('segmentationLoading').style.display = 'flex';
+    
+    try {
+        const imageToUse = workingImageBase64 || originalImageBase64;
+        if (!imageToUse) {
+            throw new Error('No hay imagen para segmentar');
+        }
+        
+        // Guardar imagen original para re-renderizar
+        segmentationOriginalImage = imageToUse;
+        
+        // Llamar a YOLO con modo mask para obtener tanto cajas como máscaras
+        const response = await fetch('/api/yolo/detect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: imageToUse,
+                mode: 'mask',  // Para obtener máscaras
+                confidence: 0.25
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Error en la detección');
+        }
+        
+        // Guardar detecciones
+        segmentationDetections = data.detections;
+        segmentationVisibleIds = segmentationDetections.map(d => d.id);  // Todos visibles inicialmente
+        
+        if (segmentationDetections.length === 0) {
+            hideLoading();
+            document.getElementById('segmentationLoading').style.display = 'none';
+            alert('No se detectaron objetos en la imagen');
+            return;
+        }
+        
+        // Renderizar lista de detecciones con toggles
+        renderSegmentationList();
+        
+        // Mostrar imagen segmentada
+        await renderSegmentedImage();
+        
+        hideLoading();
+        document.getElementById('segmentationLoading').style.display = 'none';
+        
+        // Ocultar submenú y mostrar sección de segmentación
+        hideSubMenu();
+        switchSection('segment');
+        
+    } catch (error) {
+        hideLoading();
+        document.getElementById('segmentationLoading').style.display = 'none';
+        alert('Error en segmentación: ' + error.message);
+        console.error('Segmentation error:', error);
+    }
+}
+
+function renderSegmentationList() {
+    const listContainer = document.getElementById('segDetectionsList');
+    
+    // Agrupar detecciones por clase
+    const groupedByClass = {};
+    segmentationDetections.forEach(det => {
+        if (!groupedByClass[det.class]) {
+            groupedByClass[det.class] = [];
+        }
+        groupedByClass[det.class].push(det);
+    });
+    
+    let html = '';
+    
+    for (const [className, detections] of Object.entries(groupedByClass)) {
+        const allVisible = detections.every(d => segmentationVisibleIds.includes(d.id));
+        const someVisible = detections.some(d => segmentationVisibleIds.includes(d.id));
+        
+        html += `
+            <div class="detection-group">
+                <div class="detection-class-header">
+                    <label class="detection-toggle">
+                        <input type="checkbox" 
+                               class="class-toggle" 
+                               data-class="${className}"
+                               ${allVisible ? 'checked' : ''}
+                               ${someVisible && !allVisible ? 'indeterminate' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="class-name">${className}</span>
+                    <span class="class-count">(${detections.length})</span>
+                </div>
+                <div class="detection-items">
+        `;
+        
+        detections.forEach((det, idx) => {
+            const isVisible = segmentationVisibleIds.includes(det.id);
+            html += `
+                <div class="detection-item">
+                    <label class="detection-toggle">
+                        <input type="checkbox" 
+                               class="item-toggle" 
+                               data-id="${det.id}"
+                               data-class="${className}"
+                               ${isVisible ? 'checked' : ''}>
+                        <span class="toggle-slider small"></span>
+                    </label>
+                    <span class="item-label">${className} #${idx + 1}</span>
+                    <span class="item-confidence">${(det.confidence * 100).toFixed(0)}%</span>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    listContainer.innerHTML = html;
+    
+    // Agregar event listeners
+    setupSegmentationToggles();
+}
+
+function setupSegmentationToggles() {
+    // Toggle individual de cada detección
+    document.querySelectorAll('.item-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', async (e) => {
+            const id = parseInt(e.target.dataset.id);
+            if (e.target.checked) {
+                if (!segmentationVisibleIds.includes(id)) {
+                    segmentationVisibleIds.push(id);
+                }
+            } else {
+                segmentationVisibleIds = segmentationVisibleIds.filter(v => v !== id);
+            }
+            updateClassToggleState(e.target.dataset.class);
+            await renderSegmentedImage();
+        });
+    });
+    
+    // Toggle por clase (todos de esa clase)
+    document.querySelectorAll('.class-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', async (e) => {
+            const className = e.target.dataset.class;
+            const classItems = segmentationDetections.filter(d => d.class === className);
+            
+            if (e.target.checked) {
+                // Mostrar todos de esta clase
+                classItems.forEach(det => {
+                    if (!segmentationVisibleIds.includes(det.id)) {
+                        segmentationVisibleIds.push(det.id);
+                    }
+                });
+            } else {
+                // Ocultar todos de esta clase
+                const classIds = classItems.map(d => d.id);
+                segmentationVisibleIds = segmentationVisibleIds.filter(v => !classIds.includes(v));
+            }
+            
+            // Actualizar checkboxes individuales
+            document.querySelectorAll(`.item-toggle[data-class="${className}"]`).forEach(cb => {
+                cb.checked = e.target.checked;
+            });
+            
+            await renderSegmentedImage();
+        });
+    });
+}
+
+function updateClassToggleState(className) {
+    const classToggle = document.querySelector(`.class-toggle[data-class="${className}"]`);
+    if (!classToggle) return;
+    
+    const classItems = segmentationDetections.filter(d => d.class === className);
+    const visibleCount = classItems.filter(d => segmentationVisibleIds.includes(d.id)).length;
+    
+    if (visibleCount === 0) {
+        classToggle.checked = false;
+        classToggle.indeterminate = false;
+    } else if (visibleCount === classItems.length) {
+        classToggle.checked = true;
+        classToggle.indeterminate = false;
+    } else {
+        classToggle.checked = false;
+        classToggle.indeterminate = true;
+    }
+}
+
+async function renderSegmentedImage() {
+    try {
+        const mode = segmentationShowMasks ? 'mask' : 'box';
+        
+        const response = await fetch('/api/yolo/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: segmentationOriginalImage,
+                detections: segmentationDetections,
+                visible_ids: segmentationVisibleIds,
+                mode: mode
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('segmentedImage').src = data.rendered_image;
+        } else {
+            console.error('Error rendering:', data.error);
+        }
+    } catch (error) {
+        console.error('Error rendering segmented image:', error);
+    }
+}
+
+// ============ DESENCRIPTACIÓN ============
+async function performDecryption() {
+    showLoading('Desencriptando imagen...');
+    switchSection('decrypting');
+    
+    try {
+        const response = await fetch('/api/encryption/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: encryptedImageBase64,
+                encrypted_data: encryptedData,
+                alpha_r: alphaR,
+                alpha_g: alphaG,
+                alpha_b: alphaB,
+                arnold_a: arnoldA,
+                arnold_k: arnoldK
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mostrar pasos con animación secuencial
+            setTimeout(() => showStepImage('dec-step1', 'dec-step1-ph', data.encrypted), 100);
+            setTimeout(() => showStepImage('dec-step2', 'dec-step2-ph', data.after_arnold_inv), 400);
+            setTimeout(() => showStepImage('dec-step3', 'dec-step3-ph', data.after_idost), 700);
+            setTimeout(() => showStepImage('dec-step4', 'dec-step4-ph', data.decrypted), 1000);
+            
+            // Preparar resultado
+            document.getElementById('decResultEncrypted').src = data.encrypted;
+            document.getElementById('decResultDecrypted').src = data.decrypted;
+            
+            hideLoading();
+            
+            // Esperar para que se vean los pasos
+            setTimeout(() => {
+                switchSection('decryptResult');
+            }, 2000);
+        } else {
+            hideLoading();
+            alert('Error: ' + data.error);
+            if (loadedFromEncFile) {
+                switchSection('params');
+            } else {
+                switchSection('encryptResult');
+            }
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Error: ' + error.message);
+        if (loadedFromEncFile) {
+            switchSection('params');
+        } else {
+            switchSection('encryptResult');
+        }
+    }
+}
+
+// ============ DESENCRIPTACIÓN MÚLTIPLE (3 compresiones) ============
+async function performMultiDecryption() {
+    showLoading('Desencriptando las 3 versiones...');
+    
+    try {
+        // Desencriptar 30%
+        showLoading('Desencriptando versión 30%...');
+        const dec30 = await fetch('/api/encryption/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: encryptedImage30,
+                encrypted_data: encryptedData30,
+                alpha_r: alphaR,
+                alpha_g: alphaG,
+                alpha_b: alphaB,
+                arnold_a: arnoldA,
+                arnold_k: arnoldK,
+                compression: 30
+            })
+        });
+        const data30 = await dec30.json();
+        
+        // Desencriptar 50%
+        showLoading('Desencriptando versión 50%...');
+        const dec50 = await fetch('/api/encryption/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: encryptedImage50,
+                encrypted_data: encryptedData50,
+                alpha_r: alphaR,
+                alpha_g: alphaG,
+                alpha_b: alphaB,
+                arnold_a: arnoldA,
+                arnold_k: arnoldK,
+                compression: 50
+            })
+        });
+        const data50 = await dec50.json();
+        
+        // Desencriptar 80%
+        showLoading('Desencriptando versión 80%...');
+        const dec80 = await fetch('/api/encryption/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: encryptedImage80,
+                encrypted_data: encryptedData80,
+                alpha_r: alphaR,
+                alpha_g: alphaG,
+                alpha_b: alphaB,
+                arnold_a: arnoldA,
+                arnold_k: arnoldK,
+                compression: 80
+            })
+        });
+        const data80 = await dec80.json();
+        
+        // Mostrar resultados
+        document.getElementById('dec-comp-original').src = originalImageBase64 || workingImageBase64;
+        
+        if (data30.success) {
+            document.getElementById('dec-comp-30').src = data30.decrypted;
+            document.getElementById('psnr-30').textContent = data30.psnr ? `PSNR: ${data30.psnr.toFixed(2)} dB` : 'Recuperada';
+        }
+        
+        if (data50.success) {
+            document.getElementById('dec-comp-50').src = data50.decrypted;
+            document.getElementById('psnr-50').textContent = data50.psnr ? `PSNR: ${data50.psnr.toFixed(2)} dB` : 'Recuperada';
+        }
+        
+        if (data80.success) {
+            document.getElementById('dec-comp-80').src = data80.decrypted;
+            document.getElementById('psnr-80').textContent = data80.psnr ? `PSNR: ${data80.psnr.toFixed(2)} dB` : 'Recuperada';
+        }
+        
+        hideLoading();
+        switchSection('decryptCompare');
+        
+    } catch (error) {
+        hideLoading();
+        alert('Error: ' + error.message);
+        switchSection('compressionCompare');
+    }
+}
+
+function showStepImage(imgId, phId, src) {
+    if (src) {
+        document.getElementById(imgId).src = src;
+        document.getElementById(imgId).style.display = 'block';
+        document.getElementById(phId).style.display = 'none';
+    }
+}
+
+// ============ DESCARGAR ============
+document.getElementById('downloadEncBtn').addEventListener('click', () => {
+    if (!encryptedData) {
+        alert('No hay datos cifrados');
+        return;
+    }
+    
+    const dataToSave = {
+        ...encryptedData,
+        timestamp: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(dataToSave)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `encrypted_${Date.now()}.enc`;
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+// ============ RESET ============
+function reset() {
+    imageInput.value = '';
+    originalImageBase64 = null;
+    workingImageBase64 = null;
+    encryptedImageBase64 = null;
+    encryptedData = null;
+    selectedOption = null;
+    loadedFromEncFile = false;
+    
+    // Reset submenú
+    inSubMenu = false;
+    lastCommand = null;
+    lastCommandTime = 0;
+    document.getElementById('mainMenuOptions').style.display = 'block';
+    document.getElementById('subMenuOptions').style.display = 'none';
+    
+    // Restaurar textos de sección params
+    document.querySelector('#paramsSection h2').textContent = '🎚️ Parámetros de Encriptación';
+    document.querySelector('#paramsSection p').textContent = 'Ajusta los parámetros y di CONFIRMAR para encriptar';
+    document.querySelector('#paramsSection .voice-instruction').textContent = '💡 Ajusta los parámetros con el mouse, luego di CONFIRMAR';
+    
+    switchSection('upload');
+}
+
+// ============ HELPERS ============
+function showLoading(text) {
+    loadingText.textContent = text;
+    loadingOverlay.classList.add('show');
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('show');
+}
+
+function updateStatusIndicators() {
+    document.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
+    
+    if (selectedOption) {
+        const items = document.querySelectorAll(`.option-item[data-option="${selectedOption}"]`);
+        items.forEach(item => {
+            if (item.closest('.processor-section.active')) {
+                item.classList.add('selected');
+            }
+        });
+    }
+}
+
+// ============ EJECUTAR ACCIÓN ============
+function executeAction() {
+    console.log(`Ejecutando: state=${currentState}, option=${selectedOption}, fromEnc=${loadedFromEncFile}, inSubMenu=${inSubMenu}`);
+    
+    if (currentState === 'image') {
+        if (inSubMenu) {
+            // Estamos en el submenú de "Más opciones"
+            if (selectedOption === 'uno') {
+                // Comprimir imagen
+                performCompression();
+            } else if (selectedOption === 'dos') {
+                // Segmentar imagen con YOLO
+                performSegmentation();
+            }
+        } else {
+            // Menú principal
+            if (selectedOption === 'uno') {
+                // Encriptar
+                loadedFromEncFile = false;
+                document.querySelector('#paramsSection h2').textContent = '🎚️ Parámetros de Encriptación';
+                document.querySelector('#paramsSection p').textContent = 'Ajusta los parámetros y di CONFIRMAR para encriptar';
+                document.querySelector('#paramsSection .voice-instruction').textContent = '💡 Ajusta los parámetros con el mouse, luego di CONFIRMAR';
+                switchSection('params');
+            } else if (selectedOption === 'dos') {
+                // Mostrar submenú de "Más opciones"
+                showSubMenu();
+            }
+        }
+    } else if (currentState === 'segment') {
+        if (selectedOption === 'uno') {
+            reset();
+        }
+    } else if (currentState === 'compression') {
+        if (selectedOption === 'uno') {
+            reset();
+        }
+    } else if (currentState === 'params') {
+        if (selectedOption === 'confirmar') {
+            if (loadedFromEncFile) {
+                performDecryption();
+            } else {
+                performEncryption();
+            }
+        }
+    } else if (currentState === 'encryptResult') {
+        if (selectedOption === 'uno') {
+            performDecryption();
+        } else if (selectedOption === 'dos') {
+            reset();
+        }
+    } else if (currentState === 'decryptResult') {
+        if (selectedOption === 'uno') {
+            reset();
+        } else if (selectedOption === 'dos') {
+            loadedFromEncFile = false;
+            document.querySelector('#paramsSection h2').textContent = '🎚️ Parámetros de Encriptación';
+            document.querySelector('#paramsSection p').textContent = 'Ajusta los parámetros y di CONFIRMAR para encriptar';
+            document.querySelector('#paramsSection .voice-instruction').textContent = '💡 Ajusta los parámetros con el mouse, luego di CONFIRMAR';
+            switchSection('params');
+        }
+    }
+    
+    selectedOption = null;
+    updateStatusIndicators();
+}
+
+// ============ SUBMENÚ MÁS OPCIONES ============
+function showSubMenu() {
+    inSubMenu = true;
+    document.getElementById('mainMenuOptions').style.display = 'none';
+    document.getElementById('subMenuOptions').style.display = 'block';
+    selectedOption = null;
+    updateStatusIndicators();
+}
+
+function hideSubMenu() {
+    inSubMenu = false;
+    document.getElementById('mainMenuOptions').style.display = 'block';
+    document.getElementById('subMenuOptions').style.display = 'none';
+    selectedOption = null;
+    lastCommand = null;
+    lastCommandTime = 0;
+    updateStatusIndicators();
+}
+
+// ============ COMANDOS DE VOZ ============
+function handleVoiceCommand(command) {
+    console.log(`Comando: ${command}, state=${currentState}, modal=${showingConfirmationModal}`);
+    
+    // Si el modal de confirmación está abierto
+    if (showingConfirmationModal) {
+        if (command === 'uno' || command === '1') {
+            confirmationModalSelection = 'confirmar';
+            document.getElementById('btnConfirmNo').classList.remove('highlight');
+            document.getElementById('btnConfirmYes').classList.add('highlight');
+            return;
+        } else if (command === 'dos' || command === '2') {
+            hideConfirmationModal();
+            return;
+        } else if (command === 'confirmar') {
+            if (confirmationModalSelection === 'confirmar') {
+                hideConfirmationModal();
+                executeAction();
+            }
+            return;
+        }
+        return;
+    }
+    
+    // Verificar comando repetido para volver del submenú
+    if (inSubMenu && currentState === 'image') {
+        const now = Date.now();
+        const normalizedCommand = (command === '1') ? 'uno' : (command === '2') ? 'dos' : command;
+        
+        if (lastCommand === normalizedCommand && (now - lastCommandTime) < DOUBLE_COMMAND_TIMEOUT) {
+            // Comando repetido - volver al menú principal
+            hideSubMenu();
+            lastCommand = null;
+            lastCommandTime = 0;
+            return;
+        }
+        
+        lastCommand = normalizedCommand;
+        lastCommandTime = now;
+    }
+    
+    // Comandos normales
+    if ((command === 'uno' || command === '1') && currentState !== 'params') {
+        selectedOption = 'uno';
+        updateStatusIndicators();
+    } else if (command === 'dos' || command === '2') {
+        selectedOption = 'dos';
+        updateStatusIndicators();
+    } else if (command === 'confirmar') {
+        if (selectedOption) {
+            if (doubleConfirmEnabled) {
+                showConfirmationModal();
+            } else {
+                executeAction();
+            }
+        } else if (currentState === 'params') {
+            // En params, CONFIRMAR directo ejecuta encriptación
+            selectedOption = 'confirmar';
+            if (doubleConfirmEnabled) {
+                showConfirmationModal();
+            } else {
+                executeAction();
+            }
+        }
+    }
+}
+
+// ============ MODAL DE CONFIRMACIÓN ============
+function showConfirmationModal() {
+    showingConfirmationModal = true;
+    confirmationModalSelection = null;
+    
+    let message = 'Se ejecutará la acción seleccionada';
+    if (currentState === 'image' && selectedOption === 'uno') {
+        message = 'Se abrirán los parámetros de encriptación';
+    } else if (currentState === 'image' && selectedOption === 'dos') {
+        message = 'Se desencriptará la imagen';
+    } else if (currentState === 'params') {
+        if (loadedFromEncFile) {
+            message = 'Se desencriptará con los parámetros actuales';
+        } else {
+            message = 'Se encriptará la imagen';
+        }
+    } else if (currentState === 'encryptResult' && selectedOption === 'uno') {
+        message = 'Se desencriptará la imagen';
+    } else if (currentState === 'encryptResult' && selectedOption === 'dos') {
+        message = 'Se cargará una nueva imagen';
+    } else if (currentState === 'compression' && selectedOption === 'uno') {
+        message = 'Se cargará una nueva imagen';
+    } else if (currentState === 'image' && inSubMenu && selectedOption === 'uno') {
+        message = 'Se comprimirá la imagen al 30%, 50% y 80%';
+    } else if (currentState === 'image' && inSubMenu && selectedOption === 'dos') {
+        message = 'Se segmentará la imagen';
+    } else if (currentState === 'image' && !inSubMenu && selectedOption === 'dos') {
+        message = 'Se mostrarán más opciones';
+    }
+    
+    document.getElementById('confirmationMessage').textContent = message;
+    document.getElementById('btnConfirmYes').classList.remove('highlight');
+    document.getElementById('btnConfirmNo').classList.remove('highlight');
+    document.getElementById('confirmationModal').classList.add('show');
+    document.getElementById('confirmationModalOverlay').classList.add('show');
+}
+
+function hideConfirmationModal() {
+    showingConfirmationModal = false;
+    confirmationModalSelection = null;
+    document.getElementById('confirmationModal').classList.remove('show');
+    document.getElementById('confirmationModalOverlay').classList.remove('show');
+}
+
+// ============ BOTONES MODAL ============
+document.getElementById('btnConfirmYes').addEventListener('click', () => {
+    hideConfirmationModal();
+    executeAction();
+});
+
+document.getElementById('btnConfirmNo').addEventListener('click', () => {
+    hideConfirmationModal();
+});
+
+document.getElementById('confirmationModalOverlay').addEventListener('click', hideConfirmationModal);
+
+// ============ SEGMENTACIÓN - BOTONES DE MODO Y TOGGLE ============
+document.getElementById('segModeBox').addEventListener('click', async () => {
+    segmentationShowMasks = false;
+    document.getElementById('segModeBox').classList.add('active');
+    document.getElementById('segModeMask').classList.remove('active');
+    await renderSegmentedImage();
+});
+
+document.getElementById('segModeMask').addEventListener('click', async () => {
+    segmentationShowMasks = true;
+    document.getElementById('segModeMask').classList.add('active');
+    document.getElementById('segModeBox').classList.remove('active');
+    await renderSegmentedImage();
+});
+
+document.getElementById('segShowAll').addEventListener('click', async () => {
+    segmentationVisibleIds = segmentationDetections.map(d => d.id);
+    document.querySelectorAll('.item-toggle').forEach(cb => cb.checked = true);
+    document.querySelectorAll('.class-toggle').forEach(cb => {
+        cb.checked = true;
+        cb.indeterminate = false;
+    });
+    await renderSegmentedImage();
+});
+
+document.getElementById('segHideAll').addEventListener('click', async () => {
+    segmentationVisibleIds = [];
+    document.querySelectorAll('.item-toggle').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.class-toggle').forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
+    });
+    await renderSegmentedImage();
+});
+
+// ============ TECLADO ============
+document.addEventListener('keydown', (e) => {
+    if (e.key === '1') {
+        handleVoiceCommand('uno');
+    } else if (e.key === '2') {
+        handleVoiceCommand('dos');
+    } else if (e.key === 'Enter') {
+        handleVoiceCommand('confirmar');
+    }
+});
+
+// ============ DROPDOWN ============
+const optionsDropdown = document.getElementById('optionsDropdown');
+const dropdownMenu = document.getElementById('dropdownMenu');
+
+optionsDropdown.addEventListener('click', () => {
+    const isVisible = dropdownMenu.style.display !== 'none';
+    dropdownMenu.style.display = isVisible ? 'none' : 'flex';
+});
+
+document.getElementById('doubleConfirmToggle').addEventListener('change', (e) => {
+    doubleConfirmEnabled = e.target.checked;
+    console.log(`Doble confirmación: ${doubleConfirmEnabled ? 'ON' : 'OFF'}`);
+});
+
+// ============ CROP MODAL ============
+const cropModal = document.getElementById('cropModal');
+const cropCanvas = document.getElementById('cropCanvas');
+const cropCtx = cropCanvas.getContext('2d');
+const cropXInput = document.getElementById('cropX');
+const cropYInput = document.getElementById('cropY');
+const cropSizeInput = document.getElementById('cropSizeInput');
+const cropSizeDisplay = document.getElementById('cropSizeDisplay');
+const cropPresets = document.getElementById('cropPresets');
+const cropBtn = document.getElementById('cropBtn');
+const cropCloseBtn = document.getElementById('cropCloseBtn');
+const cropCancelBtn = document.getElementById('cropCancelBtn');
+const cropApplyBtn = document.getElementById('cropApplyBtn');
+
+let cropImg = null;
+let cropX = 0;
+let cropY = 0;
+let cropSize = 256;
+let cropImageWidth = 0;
+let cropImageHeight = 0;
+let canvasScale = 1;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+cropBtn.addEventListener('click', () => {
+    if (!workingImageBase64) return;
+    const img = new Image();
+    img.onload = () => {
+        showCropModal(img);
+    };
+    img.src = workingImageBase64;
+});
+
+cropCloseBtn.addEventListener('click', closeCropModal);
+cropCancelBtn.addEventListener('click', closeCropModal);
+
+function showCropModal(img) {
+    cropImg = img;
+    cropImageWidth = img.width;
+    cropImageHeight = img.height;
+    
+    // Set canvas size (max 600px)
+    const maxCanvasSize = 600;
+    canvasScale = Math.min(maxCanvasSize / img.width, maxCanvasSize / img.height, 1);
+    cropCanvas.width = img.width * canvasScale;
+    cropCanvas.height = img.height * canvasScale;
+    
+    // Initial crop values
+    const maxSize = Math.min(img.width, img.height);
+    cropSize = maxSize;
+    cropX = Math.floor((img.width - maxSize) / 2);
+    cropY = Math.floor((img.height - maxSize) / 2);
+    
+    // Generate presets
+    generateCropPresets(maxSize);
+    
+    // Update inputs
+    updateCropInputs();
+    drawCropPreview();
+    
+    cropModal.classList.add('show');
+}
+
+function closeCropModal() {
+    cropModal.classList.remove('show');
+}
+
+function generateCropPresets(maxSize) {
+    cropPresets.innerHTML = '';
+    const sizes = [64, 128, 256, 512, maxSize].filter(s => s <= maxSize);
+    const uniqueSizes = [...new Set(sizes)];
+    
+    uniqueSizes.forEach(size => {
+        const btn = document.createElement('button');
+        btn.className = 'crop-preset-btn';
+        btn.textContent = `${size}×${size}`;
+        btn.addEventListener('click', () => {
+            cropSize = size;
+            // Center the crop area
+            cropX = Math.floor((cropImageWidth - size) / 2);
+            cropY = Math.floor((cropImageHeight - size) / 2);
+            updateCropInputs();
+            drawCropPreview();
+            
+            // Update active button
+            document.querySelectorAll('.crop-preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+        cropPresets.appendChild(btn);
+    });
+}
+
+function updateCropInputs() {
+    cropXInput.value = cropX;
+    cropYInput.value = cropY;
+    cropSizeInput.value = cropSize;
+    cropXInput.max = cropImageWidth - cropSize;
+    cropYInput.max = cropImageHeight - cropSize;
+    cropSizeInput.max = Math.min(cropImageWidth, cropImageHeight);
+    cropSizeDisplay.textContent = `Selección: ${cropSize} × ${cropSize}`;
+}
+
+function drawCropPreview() {
+    if (!cropImg) return;
+    
+    cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Draw image
+    cropCtx.drawImage(cropImg, 0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Darken outside area
+    cropCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Clear crop area (show original)
+    const sx = cropX * canvasScale;
+    const sy = cropY * canvasScale;
+    const sw = cropSize * canvasScale;
+    
+    cropCtx.clearRect(sx, sy, sw, sw);
+    cropCtx.drawImage(
+        cropImg,
+        cropX, cropY, cropSize, cropSize,
+        sx, sy, sw, sw
+    );
+    
+    // Draw border
+    cropCtx.strokeStyle = '#0066cc';
+    cropCtx.lineWidth = 2;
+    cropCtx.strokeRect(sx, sy, sw, sw);
+}
+
+// Crop canvas mouse events
+cropCanvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    const rect = cropCanvas.getBoundingClientRect();
+    dragStartX = e.clientX - rect.left;
+    dragStartY = e.clientY - rect.top;
+});
+
+cropCanvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    
+    const rect = cropCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Calculate new position
+    const deltaX = (x - dragStartX) / canvasScale;
+    const deltaY = (y - dragStartY) / canvasScale;
+    
+    cropX = Math.max(0, Math.min(cropImageWidth - cropSize, cropX + deltaX));
+    cropY = Math.max(0, Math.min(cropImageHeight - cropSize, cropY + deltaY));
+    
+    cropX = Math.round(cropX);
+    cropY = Math.round(cropY);
+    
+    dragStartX = x;
+    dragStartY = y;
+    
+    updateCropInputs();
+    drawCropPreview();
+});
+
+cropCanvas.addEventListener('mouseup', () => isDragging = false);
+cropCanvas.addEventListener('mouseleave', () => isDragging = false);
+
+// Input changes
+cropXInput.addEventListener('change', () => {
+    cropX = Math.max(0, Math.min(cropImageWidth - cropSize, parseInt(cropXInput.value) || 0));
+    updateCropInputs();
+    drawCropPreview();
+});
+
+cropYInput.addEventListener('change', () => {
+    cropY = Math.max(0, Math.min(cropImageHeight - cropSize, parseInt(cropYInput.value) || 0));
+    updateCropInputs();
+    drawCropPreview();
+});
+
+cropSizeInput.addEventListener('change', () => {
+    const newSize = Math.max(1, Math.min(Math.min(cropImageWidth, cropImageHeight), parseInt(cropSizeInput.value) || 1));
+    cropSize = newSize;
+    cropX = Math.min(cropX, cropImageWidth - cropSize);
+    cropY = Math.min(cropY, cropImageHeight - cropSize);
+    updateCropInputs();
+    drawCropPreview();
+});
+
+// Apply crop
+cropApplyBtn.addEventListener('click', async () => {
+    showLoading('Recortando imagen...');
+    
+    try {
+        const response = await fetch('/api/encryption/crop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: workingImageBase64,
+                x: cropX,
+                y: cropY,
+                size: cropSize
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            workingImageBase64 = data.cropped_image;
+            document.getElementById('loadedImage').src = workingImageBase64;
+            document.getElementById('imageDims').textContent = `${cropSize} × ${cropSize}`;
+            imageSize = cropSize;
+            closeCropModal();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+    
+    hideLoading();
+});
+
+// ============ LOAD .ENC FILE ============
+const loadEncBtn = document.getElementById('loadEncBtn');
+const encFileInput = document.getElementById('encFileInput');
+const loadEncBtnMain = document.getElementById('loadEncBtnMain');
+const encFileInputMain = document.getElementById('encFileInputMain');
+
+// Función compartida para cargar .enc
+async function handleEncFileLoad(file) {
+    if (!file) return;
+    
+    try {
+        showLoading('Cargando archivo cifrado...');
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        // El formato guardado tiene r_real, r_imag, etc. directamente
+        if (data.r_real && data.r_imag) {
+            encryptedData = data;
+            loadedFromEncFile = true;  // Flag para saber que venimos de .enc
+            
+            // Restore parameters
+            if (data.alpha_r !== undefined) {
+                alphaR = data.alpha_r;
+                alphaG = data.alpha_g;
+                alphaB = data.alpha_b;
+                arnoldA = data.arnold_a;
+                arnoldK = data.arnold_k;
+                
+                // Update sliders
+                alphaRSlider.value = alphaR;
+                alphaGSlider.value = alphaG;
+                alphaBSlider.value = alphaB;
+                document.getElementById('alphaRValue').textContent = alphaR.toFixed(2);
+                document.getElementById('alphaGValue').textContent = alphaG.toFixed(2);
+                document.getElementById('alphaBValue').textContent = alphaB.toFixed(2);
+                document.getElementById('arnoldASlider').value = arnoldA;
+                document.getElementById('arnoldKSlider').value = arnoldK;
+                document.getElementById('arnoldAValue').textContent = arnoldA;
+                document.getElementById('arnoldKValue').textContent = arnoldK;
+                
+                // Desactivar sync de alphas ya que cada canal puede tener valor diferente
+                document.getElementById('syncAlphas').checked = (alphaR === alphaG && alphaG === alphaB);
+            }
+            
+            // Generate encrypted preview image
+            encryptedImageBase64 = generateEncryptedPreviewFromData(data);
+            
+            hideLoading();
+            
+            // Ir a sección de parámetros para poder editarlos antes de desencriptar
+            // Cambiar el texto de la sección para indicar que es desencriptación
+            document.querySelector('#paramsSection h2').textContent = '🔓 Parámetros de Desencriptación';
+            document.querySelector('#paramsSection p').textContent = 'Verifica/ajusta los parámetros y di CONFIRMAR para desencriptar';
+            document.querySelector('#paramsSection .voice-instruction').textContent = '💡 Parámetros cargados del archivo .enc - Puedes modificarlos si lo deseas';
+            switchSection('params');
+            
+        } else {
+            hideLoading();
+            alert('Archivo .enc inválido. Formato no reconocido.');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error(error);
+        alert('Error leyendo archivo: ' + error.message);
+    }
+}
+
+// Generar imagen preview desde datos cifrados
+function generateEncryptedPreviewFromData(data) {
+    if (!data.r_real || !data.g_real || !data.b_real) return null;
+    
+    const N = data.r_real.length;
+    const canvas = document.createElement('canvas');
+    canvas.width = N;
+    canvas.height = N;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(N, N);
+    
+    // Calcular magnitudes y normalizar
+    let maxMag = 0;
+    const magR = [], magG = [], magB = [];
+    
+    for (let i = 0; i < N; i++) {
+        magR[i] = [];
+        magG[i] = [];
+        magB[i] = [];
+        for (let j = 0; j < N; j++) {
+            const mr = Math.sqrt(data.r_real[i][j]**2 + data.r_imag[i][j]**2);
+            const mg = Math.sqrt(data.g_real[i][j]**2 + data.g_imag[i][j]**2);
+            const mb = Math.sqrt(data.b_real[i][j]**2 + data.b_imag[i][j]**2);
+            magR[i][j] = mr;
+            magG[i][j] = mg;
+            magB[i][j] = mb;
+            maxMag = Math.max(maxMag, mr, mg, mb);
+        }
+    }
+    
+    // Normalizar y crear imagen
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            const idx = (i * N + j) * 4;
+            imageData.data[idx] = Math.round(magR[i][j] / maxMag * 255);
+            imageData.data[idx + 1] = Math.round(magG[i][j] / maxMag * 255);
+            imageData.data[idx + 2] = Math.round(magB[i][j] / maxMag * 255);
+            imageData.data[idx + 3] = 255;
+        }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+}
+
+// Botón en sección de imagen
+loadEncBtn.addEventListener('click', () => encFileInput.click());
+encFileInput.addEventListener('change', (e) => {
+    handleEncFileLoad(e.target.files[0]);
+    encFileInput.value = '';
+});
+
+// Botón en sección inicial (upload)
+loadEncBtnMain.addEventListener('click', () => encFileInputMain.click());
+encFileInputMain.addEventListener('change', (e) => {
+    handleEncFileLoad(e.target.files[0]);
+    encFileInputMain.value = '';
+});
+
+// ============ AUDIO RECORDING ============
+let audioContext = null;
+let scriptNode = null;
+let analyserNode = null;  // Para VAD
+let audioChunks = [];
+let isRecording = false;
+let recordingStartTime = null;
+let timerInterval = null;
+
+// Escucha continua
+let continuousListening = false;
+let isProcessing = false;
+let audioStream = null;
+
+// VAD con AnalyserNode (Web Audio API nativo)
+const VAD_THRESHOLD = -65;           // dB threshold para detectar voz (subido de -70)
+const VAD_SMOOTHING = 0.5;           // Smoothing del analyser (reducido para más responsividad)
+const MAX_DISTANCE_THRESHOLD = 25.0; // Distancia máxima para reconocimiento válido (más alto = más permisivo)
+const SPEECH_MIN_DURATION = 150;     // ms mínimos de voz para grabar
+const SILENCE_TIMEOUT = 500;         // ms de silencio para terminar grabación
+const COMMAND_COOLDOWN_MS = 2000;    // Cooldown de 3 segundos después de detectar un comando
+
+let isSpeaking = false;
+let speechStartTime = null;
+let silenceStartTime = null;
+let vadChunks = [];
+let lastRecognizedTime = 0;          // Timestamp del último comando reconocido
+
+const recordButton = document.getElementById('recordButton');
+const audioModal = document.getElementById('audioModal');
+const recordingTimer = document.getElementById('recordingTimer');
+const timerCount = document.getElementById('timerCount');
+const audioLevelContainer = document.getElementById('audioLevelContainer');
+const audioLevelBar = document.getElementById('audioLevelBar');
+const continuousListenToggle = document.getElementById('continuousListenToggle');
+const vadIndicator = document.getElementById('vadIndicator');
+const vadDot = document.getElementById('vadDot');
+const vadText = document.getElementById('vadText');
+
+class WavEncoder {
+    static encode(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        
+        function writeString(offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        
+        let offset = 44;
+        for (let i = 0; i < samples.length; i++) {
+            let s = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            offset += 2;
+        }
+        
+        return buffer;
+    }
+}
+
+window.addEventListener('load', () => {
+    audioModal.classList.remove('hidden');
+    initAudio();
+});
+
+async function initAudio() {
+    try {
+        const options = typeof getAudioOptions === 'function' ? await getAudioOptions() : { audio: true };
+        audioStream = await navigator.mediaDevices.getUserMedia(options);
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(audioStream);
+        
+        // Crear AnalyserNode para VAD
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 2048;
+        analyserNode.smoothingTimeConstant = VAD_SMOOTHING;
+        source.connect(analyserNode);
+        
+        // ScriptProcessor para capturar audio
+        scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(scriptNode);
+        scriptNode.connect(audioContext.destination);
+        
+        audioStatus.textContent = '✅ Presiona para grabar';
+        recordButton.disabled = false;
+    } catch (error) {
+        console.error('Error micrófono:', error);
+        audioStatus.textContent = `❌ ${error.name}`;
+        recordButton.disabled = true;
+    }
+}
+
+// Obtener nivel de audio en dB usando AnalyserNode
+function getAudioLevelDB() {
+    if (!analyserNode) return -100;
+    
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(dataArray);
+    
+    // Calcular promedio de frecuencias (enfocarse en rango de voz: 85-255 Hz aprox)
+    let sum = 0;
+    const startBin = Math.floor(85 * analyserNode.fftSize / audioContext.sampleRate);
+    const endBin = Math.floor(3000 * analyserNode.fftSize / audioContext.sampleRate);
+    
+    for (let i = startBin; i < endBin && i < dataArray.length; i++) {
+        sum += dataArray[i];
+    }
+    
+    const average = sum / (endBin - startBin);
+    // Convertir a dB aproximado (-100 a 0)
+    const db = (average / 255) * 100 - 100;
+    return db;
+}
+
+// VAD mejorado: detecta voz vs ruido usando características espectrales
+function isLikelyVoice() {
+    if (!analyserNode) return false;
+    
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(dataArray);
+    
+    const sampleRate = audioContext.sampleRate;
+    const binSize = sampleRate / analyserNode.fftSize;
+    
+    // Rangos de frecuencia
+    const voiceLowStart = Math.floor(80 / binSize);   // 80 Hz
+    const voiceLowEnd = Math.floor(300 / binSize);    // 300 Hz (fundamentales)
+    const voiceMidStart = Math.floor(300 / binSize);  // 300 Hz
+    const voiceMidEnd = Math.floor(2000 / binSize);   // 2000 Hz (formantes)
+    const highStart = Math.floor(4000 / binSize);     // 4000 Hz+
+    const highEnd = Math.floor(8000 / binSize);       // ruido/sibilantes
+    
+    // Calcular energía en cada banda
+    let lowEnergy = 0, midEnergy = 0, highEnergy = 0, totalEnergy = 0;
+    
+    for (let i = voiceLowStart; i < voiceLowEnd && i < dataArray.length; i++) {
+        lowEnergy += dataArray[i];
+    }
+    for (let i = voiceMidStart; i < voiceMidEnd && i < dataArray.length; i++) {
+        midEnergy += dataArray[i];
+    }
+    for (let i = highStart; i < highEnd && i < dataArray.length; i++) {
+        highEnergy += dataArray[i];
+    }
+    for (let i = 0; i < dataArray.length; i++) {
+        totalEnergy += dataArray[i];
+    }
+    
+    // Normalizar
+    const lowBins = voiceLowEnd - voiceLowStart;
+    const midBins = voiceMidEnd - voiceMidStart;
+    const highBins = highEnd - highStart;
+    
+    lowEnergy = lowEnergy / lowBins;
+    midEnergy = midEnergy / midBins;
+    highEnergy = highEnergy / highBins;
+    
+    // La voz humana tiene:
+    // 1. Energía significativa en frecuencias bajas (fundamentales 80-300Hz)
+    // 2. Energía en medios (formantes 300-2000Hz)
+    // 3. Proporción low+mid >> high (ruidos como tos tienen más high)
+    
+    const voiceRatio = (lowEnergy + midEnergy) / (highEnergy + 1);
+    const hasLowEnergy = lowEnergy > 20;  // Tiene fundamentales
+    const hasMidEnergy = midEnergy > 15;  // Tiene formantes
+    const goodRatio = voiceRatio > 1.5;   // Más voz que ruido
+    
+    // Debug
+    // console.log(`Low: ${lowEnergy.toFixed(0)}, Mid: ${midEnergy.toFixed(0)}, High: ${highEnergy.toFixed(0)}, Ratio: ${voiceRatio.toFixed(1)}`);
+    
+    return hasLowEnergy && hasMidEnergy && goodRatio;
+}
+
+// Toggle escucha continua
+continuousListenToggle.addEventListener('change', (e) => {
+    continuousListening = e.target.checked;
+    if (continuousListening) {
+        startContinuousListening();
+    } else {
+        stopContinuousListening();
+    }
+});
+
+recordButton.addEventListener('click', () => {
+    if (continuousListening) {
+        continuousListening = false;
+        continuousListenToggle.checked = false;
+        stopContinuousListening();
+    } else if (!isRecording) {
+        startRecording();
+    } else {
+        stopRecording();
+    }
+});
+
+// ============ ESCUCHA CONTINUA CON VAD ============
+let vadAnimationFrame = null;
+const RECORD_DURATION = 800;  // Grabar 700ms después de detectar voz (+ 300ms pre-buffer = 1s total)
+const PRE_BUFFER_MS = 100;    // Capturar 300ms ANTES de detectar voz
+
+function startContinuousListening() {
+    if (!audioContext) {
+        initAudio().then(() => startContinuousListening());
+        return;
+    }
+    
+    audioLevelContainer.style.display = 'block';
+    vadIndicator.style.display = 'flex';
+    recordButton.classList.add('listening');
+    recordButton.classList.remove('recording');
+    recordButton.textContent = '👂';
+    audioStatus.textContent = '🔄 Escuchando...';
+    
+    isSpeaking = false;
+    vadChunks = [];
+    isProcessing = false;
+    
+    // Pre-buffer circular para capturar audio ANTES de detectar voz
+    // 4096 samples por chunk a 44100Hz = ~93ms por chunk
+    // Para 300ms necesitamos ~4 chunks
+    let preBuffer = [];
+    const CHUNK_DURATION_MS = 4096 / (audioContext.sampleRate || 44100) * 1000;
+    const PRE_BUFFER_CHUNKS = Math.ceil(PRE_BUFFER_MS / CHUNK_DURATION_MS);
+    
+    scriptNode.onaudioprocess = (event) => {
+        if (!continuousListening) return;
+        
+        const inputData = event.inputBuffer.getChannelData(0);
+        const chunk = new Float32Array(inputData);
+        
+        // Siempre mantener pre-buffer circular (últimos 300ms)
+        preBuffer.push(chunk);
+        if (preBuffer.length > PRE_BUFFER_CHUNKS) {
+            preBuffer.shift();
+        }
+        
+        // Si está grabando después de detectar voz, guardar chunks
+        if (isSpeaking && !isProcessing) {
+            vadChunks.push(chunk);
+        }
+    };
+    
+    // VAD loop con AnalyserNode
+    function vadLoop() {
+        if (!continuousListening) return;
+        
+        const db = getAudioLevelDB();
+        const levelPercent = Math.max(0, Math.min(100, (db + 100)));
+        audioLevelBar.style.width = levelPercent + '%';
+        
+        // Usar tanto threshold de dB como análisis espectral de voz
+        const aboveThreshold = db > VAD_THRESHOLD;
+        const isVoice = isLikelyVoice();
+        const voiceDetected = aboveThreshold && isVoice;
+        
+        // Verificar si estamos en cooldown
+        const inCooldown = (Date.now() - lastRecognizedTime) < COMMAND_COOLDOWN_MS;
+        
+        // Actualizar indicador visual
+        if (inCooldown) {
+            vadDot.classList.remove('speaking');
+            const remaining = Math.ceil((COMMAND_COOLDOWN_MS - (Date.now() - lastRecognizedTime)) / 1000);
+            vadText.textContent = `⏸️ Cooldown ${remaining}s`;
+        } else if (voiceDetected) {
+            vadDot.classList.add('speaking');
+            vadText.textContent = `VAD: Voz ✓ (${db.toFixed(0)} dB)`;
+        } else if (aboveThreshold && !isVoice) {
+            vadDot.classList.remove('speaking');
+            vadText.textContent = `VAD: Ruido (${db.toFixed(0)} dB)`;
+        } else {
+            vadDot.classList.remove('speaking');
+            vadText.textContent = `VAD: Silencio (${db.toFixed(0)} dB)`;
+        }
+        
+        // Lógica: detectar VOZ REAL → tomar pre-buffer + grabar 1 segundo → procesar
+        // NO grabar si estamos en cooldown
+        if (voiceDetected && !isSpeaking && !isProcessing && !inCooldown) {
+            isSpeaking = true;
+            
+            // Incluir los 300ms ANTERIORES del pre-buffer
+            vadChunks = [...preBuffer];
+            console.log(`VAD: Voz detectada, incluyendo ${preBuffer.length} chunks previos (~${Math.round(preBuffer.length * CHUNK_DURATION_MS)}ms)`);
+            
+            audioStatus.textContent = '🎙️ Grabando 1s...';
+            
+            // Después de 1 segundo, procesar
+            setTimeout(() => {
+                if (continuousListening && vadChunks.length > 0) {
+                    processVADCapture();
+                }
+                isSpeaking = false;
+            }, RECORD_DURATION);
+        }
+        
+        vadAnimationFrame = requestAnimationFrame(vadLoop);
+    }
+    
+    vadLoop();
+}
+
+async function processVADCapture() {
+    if (vadChunks.length === 0 || isProcessing) return;
+    
+    isProcessing = true;
+    const chunks = vadChunks;
+    vadChunks = [];
+    
+    audioStatus.textContent = '⏳ Procesando...';
+    
+    try {
+        // Combinar chunks
+        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const audioData = new Float32Array(totalLength);
+        let offset = 0;
+        for (let chunk of chunks) {
+            audioData.set(chunk, offset);
+            offset += chunk.length;
+        }
+        
+        console.log(`VAD: Procesando ${(totalLength / audioContext.sampleRate).toFixed(2)}s de audio`);
+        
+        const wavBuffer = WavEncoder.encode(audioData, audioContext.sampleRate);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        
+        const formData = new FormData();
+        formData.append('audio', blob, 'recording.wav');
+        
+        const response = await fetch('/api/recognize', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+        
+        if (result.success && result.recognized_command) {
+            const command = result.recognized_command.toLowerCase();
+            const minDistance = Math.min(...Object.values(result.differences));
+            
+            console.log(`Reconocido: "${command}", Distancia: ${minDistance.toFixed(4)}, Diferencias:`, result.differences);
+            
+            // Mostrar siempre qué comando detectó
+            audioStatus.textContent = `🎯 "${command}" (${minDistance.toFixed(1)})`;
+            
+            if (minDistance < MAX_DISTANCE_THRESHOLD) {
+                // Registrar tiempo para cooldown
+                lastRecognizedTime = Date.now();
+                
+                setTimeout(() => {
+                    handleVoiceCommand(command);
+                    if (continuousListening) {
+                        audioStatus.textContent = '⏸️ Cooldown...';
+                        // Mostrar mensaje de escuchando después del cooldown
+                        setTimeout(() => {
+                            if (continuousListening) {
+                                audioStatus.textContent = '🔄 Escuchando...';
+                            }
+                        }, COMMAND_COOLDOWN_MS);
+                    }
+                }, 300);
+            } else {
+                console.log(`Distancia alta (${minDistance.toFixed(2)} > ${MAX_DISTANCE_THRESHOLD}), ignorando`);
+                setTimeout(() => {
+                    if (continuousListening) {
+                        audioStatus.textContent = '🔄 Escuchando...';
+                    }
+                }, 1000);
+            }
+        } else {
+            console.log('No se reconoció comando:', result);
+            audioStatus.textContent = '❓ No reconocido';
+            setTimeout(() => {
+                if (continuousListening) {
+                    audioStatus.textContent = '🔄 Escuchando...';
+                }
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        audioStatus.textContent = '❌ Error';
+        setTimeout(() => {
+            if (continuousListening) {
+                audioStatus.textContent = '🔄 Escuchando...';
+            }
+        }, 1000);
+    }
+    
+    isProcessing = false;
+}
+
+function stopContinuousListening() {
+    continuousListening = false;
+    isProcessing = false;
+    isSpeaking = false;
+    
+    if (vadAnimationFrame) {
+        cancelAnimationFrame(vadAnimationFrame);
+        vadAnimationFrame = null;
+    }
+    
+    audioLevelContainer.style.display = 'none';
+    vadIndicator.style.display = 'none';
+    recordButton.classList.remove('listening');
+    recordButton.textContent = '🎙️';
+    audioStatus.textContent = '✅ Presiona para grabar';
+    
+    scriptNode.onaudioprocess = null;
+    vadChunks = [];
+}
+
+// ============ GRABACIÓN MANUAL ============
+function startRecording() {
+    if (!audioContext) {
+        initAudio().then(() => startRecording());
+        return;
+    }
+    
+    audioChunks = [];
+    isRecording = true;
+    recordButton.textContent = '⏹️';
+    recordButton.classList.add('recording');
+    recordingTimer.style.display = 'block';
+    audioStatus.textContent = 'Grabando...';
+    
+    recordingStartTime = Date.now();
+    timerInterval = setInterval(updateTimer, 100);
+    
+    scriptNode.onaudioprocess = (event) => {
+        if (isRecording) {
+            const inputData = event.inputBuffer.getChannelData(0);
+            audioChunks.push(new Float32Array(inputData));
+        }
+    };
+}
+
+function updateTimer() {
+    const elapsed = (Date.now() - recordingStartTime) / 1000;
+    timerCount.textContent = elapsed.toFixed(1);
+    
+    if (elapsed >= 1.0) {
+        clearInterval(timerInterval);
+        stopRecording();
+    }
+}
+
+function stopRecording() {
+    if (!isRecording) return;
+    
+    isRecording = false;
+    clearInterval(timerInterval);
+    recordButton.textContent = '🎙️';
+    recordButton.classList.remove('recording');
+    recordingTimer.style.display = 'none';
+    audioStatus.textContent = '⏳ Procesando...';
+    
+    scriptNode.onaudioprocess = null;
+    processRecording();
+}
+
+async function processRecording() {
+    try {
+        if (audioChunks.length === 0) {
+            audioStatus.textContent = '❌ Sin audio';
+            return;
+        }
+        
+        const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const audioData = new Float32Array(totalLength);
+        let offset = 0;
+        for (let chunk of audioChunks) {
+            audioData.set(chunk, offset);
+            offset += chunk.length;
+        }
+        
+        const wavBuffer = WavEncoder.encode(audioData, audioContext.sampleRate);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        
+        const formData = new FormData();
+        formData.append('audio', blob, 'recording.wav');
+        
+        const response = await fetch('/api/recognize', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.recognized_command) {
+            const command = result.recognized_command.toLowerCase();
+            const minDistance = Math.min(...Object.values(result.differences));
+            
+            console.log(`Manual - Comando: ${command}, Distancia: ${minDistance.toFixed(4)}`);
+            
+            audioStatus.textContent = `✅ "${command}"`;
+            
+            setTimeout(() => {
+                handleVoiceCommand(command);
+                audioStatus.textContent = '✅ Presiona para grabar';
+            }, 500);
+        } else {
+            audioStatus.textContent = '❌ No reconocido';
+            setTimeout(() => {
+                audioStatus.textContent = '✅ Presiona para grabar';
+            }, 1500);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        audioStatus.textContent = '❌ Error';
+        setTimeout(() => {
+            audioStatus.textContent = '✅ Presiona para grabar';
+        }, 1500);
+    }
+}
+
+console.log('🔐 Encriptación Interactiva lista');
+console.log('Usa: 1/2 para seleccionar, Enter para confirmar, o tu voz');
+</script>
+
+{% endblock %}
